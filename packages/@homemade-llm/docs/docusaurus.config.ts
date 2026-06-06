@@ -1,6 +1,8 @@
 import type * as Preset from '@docusaurus/preset-classic';
 import type { Config } from '@docusaurus/types';
 import { themes as prismThemes } from 'prism-react-renderer';
+import rehypeKatex from 'rehype-katex';
+import remarkMath from 'remark-math';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
@@ -47,6 +49,17 @@ const config: Config = {
 
   onBrokenLinks: 'throw',
 
+  // KaTeX の数式スタイルを読み込む
+  stylesheets: [
+    {
+      href: 'https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.css',
+      type: 'text/css',
+      integrity:
+        'sha384-nH0MfJ44wi1dd7w6jinlyBgljjS8EJAh2JBoRad8a3VDw2K69vfaaqm4WnR+gXtA',
+      crossorigin: 'anonymous',
+    },
+  ],
+
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
   // may want to replace "en" with "zh-Hans".
@@ -65,6 +78,8 @@ const config: Config = {
           // Remove this to remove the "edit this page" links.
           editUrl:
             'https://github.com/Imamachi-n/homemade-llm/tree/main/packages/@homemade-llm/docs/',
+          remarkPlugins: [remarkMath],
+          rehypePlugins: [rehypeKatex],
         },
         blog: false,
         theme: {
