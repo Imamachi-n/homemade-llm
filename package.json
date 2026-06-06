@@ -1,0 +1,26 @@
+{
+  "name": "homemade-llm",
+  "version": "1.0.0",
+  "description": "自作 LLM を学ぶためのドキュメントとサンプルコード（モノレポ）",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:docs": "pnpm --filter @homemade-llm/docs start",
+    "build:docs": "pnpm --filter @homemade-llm/docs build",
+    "serve:docs": "pnpm --filter @homemade-llm/docs serve",
+    "preview:docs": "pnpm build:docs && pnpm serve:docs",
+    "lint:secret": "secretlint \"**/*\"",
+    "prepare": "husky"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.8.0",
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.13",
+    "@secretlint/core": "^11.3.1",
+    "@secretlint/secretlint-rule-preset-recommend": "^11.3.1",
+    "husky": "^9.1.7",
+    "secretlint": "^11.3.1"
+  }
+}
