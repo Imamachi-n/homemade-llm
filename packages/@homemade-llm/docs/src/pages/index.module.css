@@ -1,52 +1,49 @@
 /**
- * CSS files with the .module.css suffix will be treated as CSS modules
- * and scoped locally.
+ * Homepage — "INSIDE THE MODEL"
+ * テーマトグルに依らず常にダーク没入。計器パネル / 潜在空間ラボの美学。
  */
+
+.page {
+  --ink: #06070c;
+  --ink-2: #090b14;
+  --panel: rgba(255, 255, 255, 0.025);
+  --panel-2: rgba(255, 255, 255, 0.045);
+  --hair: rgba(255, 255, 255, 0.09);
+  --txt: #e7e9f3;
+  --muted: #8a93a8;
+  --lime: #b6f400;
+  --magenta: #ff2d95;
+  --violet: #a855f7;
+  --cyan: #22d3ee;
+  --mono: var(--hl-mono);
+
+  background: var(--ink);
+  color: var(--txt);
+  min-height: 100vh;
+}
 
 /* ===== Hero ===== */
 .hero {
   position: relative;
   overflow: hidden;
-  padding: 5.5rem 0 5rem;
   isolation: isolate;
-  background:
-    radial-gradient(
-      120% 120% at 80% -10%,
-      rgba(34, 211, 238, 0.1),
-      transparent 55%
-    ),
-    radial-gradient(
-      100% 100% at 0% 0%,
-      rgba(99, 102, 241, 0.12),
-      transparent 50%
-    );
-}
-
-[data-theme="dark"] .hero {
-  background:
-    radial-gradient(
-      120% 120% at 80% -10%,
-      rgba(34, 211, 238, 0.12),
-      transparent 55%
-    ),
-    radial-gradient(
-      100% 120% at 0% 0%,
-      rgba(99, 102, 241, 0.18),
-      transparent 55%
-    ),
-    linear-gradient(180deg, #070b18, #0b1020);
+  /* フロートヘッダー(0.75rem + 3.25rem = 4rem)の下まで背景を伸ばす */
+  margin-top: -4rem;
+  padding: calc(6rem + 4rem) 0 6rem;
+  background: var(--ink);
+  border-bottom: 1px solid var(--hair);
 }
 
 .heroInner {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
   align-items: center;
   gap: 2.5rem;
 }
 
-/* ===== Background layers ===== */
+/* ===== Background stack ===== */
 .heroBg {
   position: absolute;
   inset: 0;
@@ -54,124 +51,184 @@
   pointer-events: none;
 }
 
-.grid {
-  position: absolute;
-  inset: -2px;
-  background-image:
-    linear-gradient(var(--hl-grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--hl-grid-line) 1px, transparent 1px);
-  background-size: 42px 42px;
-  mask-image: radial-gradient(120% 90% at 50% 10%, #000 35%, transparent 80%);
-  -webkit-mask-image: radial-gradient(
-    120% 90% at 50% 10%,
-    #000 35%,
-    transparent 80%
-  );
-}
-
-.blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(70px);
-  opacity: 0.7;
-  will-change: transform;
-}
-
-.blob1 {
-  width: 380px;
-  height: 380px;
-  top: -120px;
-  left: -80px;
-  background: var(--hl-glow-1);
-  animation: float1 16s ease-in-out infinite;
-}
-
-.blob2 {
-  width: 320px;
-  height: 320px;
-  top: 40px;
-  right: -60px;
-  background: var(--hl-glow-2);
-  animation: float2 19s ease-in-out infinite;
-}
-
-.blob3 {
-  width: 260px;
-  height: 260px;
-  bottom: -120px;
-  left: 45%;
-  background: var(--hl-glow-3);
-  animation: float1 22s ease-in-out infinite reverse;
-}
-
-.scan {
+.plasma {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    180deg,
-    transparent,
-    rgba(129, 140, 248, 0.06) 50%,
-    transparent
+  background:
+    radial-gradient(
+      40% 55% at 78% 18%,
+      rgba(34, 211, 238, 0.16),
+      transparent 60%
+    ),
+    radial-gradient(45% 60% at 12% 8%, rgba(168, 85, 247, 0.2), transparent 62%),
+    radial-gradient(
+      50% 70% at 60% 100%,
+      rgba(255, 45, 149, 0.12),
+      transparent 60%
+    );
+  mix-blend-mode: screen;
+}
+
+.grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(120% 80% at 50% 30%, #000 30%, transparent 78%);
+  -webkit-mask-image: radial-gradient(
+    120% 80% at 50% 30%,
+    #000 30%,
+    transparent 78%
   );
-  height: 40%;
-  animation: scan 7s linear infinite;
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 100% at 50% 40%,
+    transparent 55%,
+    rgba(0, 0, 0, 0.6)
+  );
+}
+
+/* ===== Corner ticks (instrument frame) ===== */
+.tick {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  z-index: 2;
+  border-color: var(--lime);
+  opacity: 0.6;
+}
+.tickTL {
+  top: 5rem;
+  left: 1.25rem;
+  border-top: 1.5px solid;
+  border-left: 1.5px solid;
+}
+.tickTR {
+  top: 5rem;
+  right: 1.25rem;
+  border-top: 1.5px solid;
+  border-right: 1.5px solid;
+}
+.tickBL {
+  bottom: 1.25rem;
+  left: 1.25rem;
+  border-bottom: 1.5px solid;
+  border-left: 1.5px solid;
+}
+.tickBR {
+  bottom: 1.25rem;
+  right: 1.25rem;
+  border-bottom: 1.5px solid;
+  border-right: 1.5px solid;
 }
 
 /* ===== Copy ===== */
 .heroCopy {
-  max-width: 36rem;
+  max-width: 38rem;
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  font-family: var(--hl-mono);
-  font-size: 0.74rem;
-  letter-spacing: 0.05em;
-  padding: 0.35rem 0.8rem;
+  gap: 0.55rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+  padding: 0.4rem 0.85rem;
   border-radius: 999px;
-  border: 1px solid var(--hl-panel-border);
-  background: var(--hl-panel);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  margin-bottom: 1.4rem;
+  border: 1px solid var(--hair);
+  background: var(--panel);
+  color: var(--muted);
+  margin-bottom: 1.5rem;
 }
 
 .badgeDot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--hl-cyan);
-  box-shadow: 0 0 8px 1px var(--hl-cyan);
+  background: var(--lime);
+  box-shadow: 0 0 10px 1px var(--lime);
+  animation: blink 1.6s ease-in-out infinite;
 }
 
 .title {
-  font-size: clamp(2.1rem, 5.2vw, 3.5rem);
-  line-height: 1.18;
-  letter-spacing: -0.01em;
-  margin: 0 0 1.1rem;
+  font-size: clamp(2.3rem, 5.6vw, 4rem);
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  margin: 0 0 1.2rem;
+  font-weight: 800;
+}
+
+.titleDim {
+  display: block;
+  color: var(--txt);
 }
 
 .titleAccent {
+  display: block;
   background: linear-gradient(
-    110deg,
-    var(--hl-indigo),
-    var(--hl-cyan) 45%,
-    var(--hl-violet)
+    100deg,
+    var(--magenta),
+    var(--violet) 50%,
+    var(--cyan)
   );
-  background-size: 200% auto;
+  background-size: 220% auto;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: shimmer 6s linear infinite;
+  animation: flow 8s linear infinite;
+}
+
+.scramble {
+  font-variant-ligatures: none;
+}
+
+/* System readout */
+.readout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--txt);
+  margin-bottom: 1.5rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--hair);
+  border-bottom: 1px solid var(--hair);
+}
+
+.readout span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.readout i {
+  font-style: normal;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.readout span::before {
+  content: "›";
+  color: var(--lime);
+  margin-right: 0.1rem;
 }
 
 .subtitle {
-  font-size: 1.06rem;
-  line-height: 1.8;
-  opacity: 0.78;
-  margin: 0 0 1.8rem;
+  font-size: 1.05rem;
+  line-height: 1.85;
+  color: var(--muted);
+  margin: 0 0 2rem;
 }
 
 /* ===== Buttons ===== */
@@ -186,28 +243,29 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.8rem 1.5rem;
-  border-radius: 12px;
+  padding: 0.82rem 1.6rem;
+  border-radius: 10px;
   font-weight: 700;
   font-size: 1rem;
   text-decoration: none;
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
-    background 0.2s ease;
+    background 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .primaryBtn {
-  color: #fff;
-  background: linear-gradient(110deg, var(--hl-indigo), var(--hl-violet));
-  box-shadow: 0 14px 30px -12px var(--hl-glow-1);
+  color: #05060a;
+  background: var(--lime);
+  box-shadow: 0 0 0 0 rgba(182, 244, 0, 0.5);
 }
 
 .primaryBtn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 18px 38px -12px var(--hl-glow-1);
-  color: #fff;
+  color: #05060a;
   text-decoration: none;
+  box-shadow: 0 12px 36px -8px rgba(182, 244, 0, 0.55);
 }
 
 .btnArrow {
@@ -219,24 +277,23 @@
 }
 
 .ghostBtn {
-  font-family: var(--hl-mono);
+  font-family: var(--mono);
   font-size: 0.92rem;
-  color: var(--ifm-font-color-base);
-  border: 1px solid var(--hl-panel-border);
-  background: var(--hl-panel);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  color: var(--txt);
+  border: 1px solid var(--hair);
+  background: var(--panel);
 }
 
 .ghostBtn:hover {
   transform: translateY(-2px);
-  border-color: var(--hl-indigo);
+  border-color: var(--cyan);
+  color: var(--txt);
   text-decoration: none;
-  color: var(--ifm-font-color-base);
+  box-shadow: 0 0 24px -6px rgba(34, 211, 238, 0.4);
 }
 
 .prompt {
-  color: var(--hl-cyan);
+  color: var(--lime);
   font-weight: 700;
 }
 
@@ -246,45 +303,27 @@
 }
 
 /* ===== Keyframes ===== */
-@keyframes shimmer {
+@keyframes flow {
   to {
-    background-position: 200% center;
+    background-position: 220% center;
   }
 }
 
-@keyframes float1 {
+@keyframes blink {
   0%,
   100% {
-    transform: translate(0, 0) scale(1);
+    opacity: 1;
   }
   50% {
-    transform: translate(30px, 40px) scale(1.08);
-  }
-}
-
-@keyframes float2 {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(-40px, 30px) scale(1.12);
-  }
-}
-
-@keyframes scan {
-  0% {
-    transform: translateY(-60%);
-  }
-  100% {
-    transform: translateY(260%);
+    opacity: 0.35;
   }
 }
 
 /* ===== Responsive ===== */
 @media screen and (max-width: 996px) {
   .hero {
-    padding: 3.5rem 0;
+    margin-top: -3.75rem;
+    padding: calc(4rem + 3.75rem) 0 4rem;
   }
   .heroInner {
     grid-template-columns: 1fr;
@@ -292,21 +331,14 @@
   }
   .heroCopy {
     max-width: none;
-    text-align: center;
   }
-  .badge {
-    margin-inline: auto;
-  }
-  .buttons {
-    justify-content: center;
+  .tick {
+    display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .blob1,
-  .blob2,
-  .blob3,
-  .scan,
+  .badgeDot,
   .titleAccent {
     animation: none;
   }

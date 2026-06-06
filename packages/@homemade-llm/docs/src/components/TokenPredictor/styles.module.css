@@ -1,16 +1,35 @@
+/* 計器パネル風の推論コンソール（ホームページのダーク文脈で表示） */
 .console {
   width: 100%;
-  max-width: 460px;
-  border-radius: 18px;
+  max-width: 470px;
+  border-radius: 14px;
   padding: 1.1rem 1.25rem 1.35rem;
-  background: var(--hl-panel);
-  border: 1px solid var(--hl-panel-border);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.015)
+  );
+  border: 1px solid var(--hair, rgba(255, 255, 255, 0.09));
   box-shadow:
-    0 20px 50px -20px rgba(15, 23, 42, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  font-family: var(--hl-mono);
+    0 30px 60px -28px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  font-family: var(--mono, ui-monospace, monospace);
+  position: relative;
+}
+
+.console::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(
+    90deg,
+    var(--magenta, #ff2d95),
+    var(--violet, #a855f7),
+    var(--cyan, #22d3ee)
+  );
+  opacity: 0.8;
 }
 
 .header {
@@ -24,32 +43,37 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--hl-cyan);
-  box-shadow: 0 0 0 0 var(--hl-cyan);
+  background: var(--lime, #b6f400);
+  box-shadow: 0 0 0 0 var(--lime, #b6f400);
   animation: pulse 1.8s ease-out infinite;
 }
 
 .headerLabel {
   font-size: 0.72rem;
   letter-spacing: 0.04em;
-  opacity: 0.6;
+  color: var(--muted, #8a93a8);
   text-transform: lowercase;
 }
 
 .stream {
-  font-size: 1.02rem;
+  font-size: 1.04rem;
   line-height: 1.7;
   word-break: break-word;
   min-height: 3.4rem;
   margin-bottom: 0.9rem;
+  color: var(--txt, #e7e9f3);
 }
 
 .seed {
-  opacity: 0.55;
+  color: var(--muted, #8a93a8);
 }
 
 .generated {
-  background: linear-gradient(120deg, var(--hl-indigo), var(--hl-cyan));
+  background: linear-gradient(
+    120deg,
+    var(--cyan, #22d3ee),
+    var(--violet, #a855f7)
+  );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -62,16 +86,17 @@
   height: 1.05em;
   margin-left: 1px;
   vertical-align: text-bottom;
-  background: var(--hl-violet);
-  animation: blink 1s steps(2, start) infinite;
+  background: var(--lime, #b6f400);
+  box-shadow: 0 0 8px var(--lime, #b6f400);
+  animation: caret 1s steps(2, start) infinite;
 }
 
 .predictLabel {
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  opacity: 0.5;
-  margin-bottom: 0.55rem;
+  color: var(--muted, #8a93a8);
+  margin-bottom: 0.6rem;
 }
 
 .candidates {
@@ -86,8 +111,8 @@
   grid-template-columns: 4.5rem 1fr 2.6rem;
   align-items: center;
   gap: 0.55rem;
-  padding: 0.28rem 0.4rem;
-  border-radius: 9px;
+  padding: 0.3rem 0.4rem;
+  border-radius: 8px;
   opacity: 0;
   animation: slideIn 0.4s ease forwards;
 }
@@ -95,9 +120,10 @@
 .rowTop {
   background: linear-gradient(
     90deg,
-    rgba(99, 102, 241, 0.16),
-    rgba(34, 211, 238, 0.06)
+    rgba(182, 244, 0, 0.12),
+    rgba(34, 211, 238, 0.04)
   );
+  box-shadow: inset 0 0 0 1px rgba(182, 244, 0, 0.18);
 }
 
 .token {
@@ -106,17 +132,18 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--txt, #e7e9f3);
 }
 
 .rowTop .token {
-  color: var(--hl-indigo);
+  color: var(--lime, #b6f400);
 }
 
 .barTrack {
   position: relative;
   height: 7px;
   border-radius: 999px;
-  background: var(--hl-grid-line);
+  background: rgba(255, 255, 255, 0.07);
   overflow: hidden;
 }
 
@@ -124,24 +151,36 @@
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--hl-indigo), var(--hl-cyan));
-  width: 0;
-  animation: grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  background: linear-gradient(
+    90deg,
+    var(--cyan, #22d3ee),
+    var(--violet, #a855f7)
+  );
+  transform: scaleX(0);
   transform-origin: left;
+  animation: grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.rowTop .barFill {
+  background: linear-gradient(
+    90deg,
+    var(--lime, #b6f400),
+    var(--cyan, #22d3ee)
+  );
 }
 
 .row:not(.rowTop) .barFill {
   background: linear-gradient(
     90deg,
-    rgba(148, 163, 184, 0.7),
-    rgba(148, 163, 184, 0.4)
+    rgba(138, 147, 168, 0.7),
+    rgba(138, 147, 168, 0.35)
   );
 }
 
 .prob {
   font-size: 0.78rem;
   text-align: right;
-  opacity: 0.65;
+  color: var(--muted, #8a93a8);
   font-variant-numeric: tabular-nums;
 }
 
@@ -150,12 +189,14 @@
   top: -0.55rem;
   right: 0.4rem;
   font-size: 0.55rem;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  padding: 0.05rem 0.4rem;
+  padding: 0.06rem 0.45rem;
   border-radius: 999px;
-  color: #fff;
-  background: linear-gradient(90deg, var(--hl-violet), var(--hl-pink));
+  color: #05060a;
+  font-weight: 700;
+  background: var(--lime, #b6f400);
+  box-shadow: 0 0 12px rgba(182, 244, 0, 0.5);
 }
 
 .done {
@@ -168,9 +209,9 @@
   font-weight: 700;
   background: linear-gradient(
     120deg,
-    var(--hl-indigo),
-    var(--hl-cyan),
-    var(--hl-violet)
+    var(--magenta, #ff2d95),
+    var(--violet, #a855f7),
+    var(--cyan, #22d3ee)
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -179,7 +220,7 @@
   padding: 0;
 }
 
-@keyframes blink {
+@keyframes caret {
   0%,
   50% {
     opacity: 1;
@@ -192,13 +233,13 @@
 
 @keyframes pulse {
   0% {
-    box-shadow: 0 0 0 0 var(--hl-glow-2);
+    box-shadow: 0 0 0 0 rgba(182, 244, 0, 0.5);
   }
   70% {
-    box-shadow: 0 0 0 8px rgba(34, 211, 238, 0);
+    box-shadow: 0 0 0 8px rgba(182, 244, 0, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(34, 211, 238, 0);
+    box-shadow: 0 0 0 0 rgba(182, 244, 0, 0);
   }
 }
 
@@ -220,11 +261,6 @@
   to {
     transform: scaleX(1);
   }
-}
-
-/* barFill は width をインライン指定し、scaleX で伸ばす */
-.barFill {
-  transform: scaleX(0);
 }
 
 @media (prefers-reduced-motion: reduce) {
