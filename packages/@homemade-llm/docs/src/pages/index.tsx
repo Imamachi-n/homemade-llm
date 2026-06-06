@@ -118,13 +118,6 @@ function HomepageHero() {
 export default function Home(): ReactNode {
   const { siteConfig } = useDocusaurusContext();
 
-  // ホームページはテーマトグルに依らずダーク没入。navbar も合わせるため html にクラス付与。
-  useEffect(() => {
-    const el = document.documentElement;
-    el.classList.add('homepage');
-    return () => el.classList.remove('homepage');
-  }, []);
-
   return (
     <Layout title={siteConfig.title} description={siteConfig.tagline}>
       <div className={styles.page}>

@@ -1,0 +1,344 @@
+.footer {
+  --f-lime: #b6f400;
+  --f-magenta: #ff2d95;
+  --f-violet: #a855f7;
+  --f-cyan: #22d3ee;
+  --f-txt: #e7e9f3;
+  --f-muted: #8a93a8;
+  --f-hair: rgba(255, 255, 255, 0.09);
+
+  position: relative;
+  overflow: hidden;
+  background: #06070c;
+  border-top: 1px solid var(--f-hair);
+  padding: 0;
+}
+
+/* flowing gradient line across the top, echoing the pipeline rail */
+.topline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--f-lime),
+    var(--f-cyan),
+    var(--f-violet),
+    var(--f-magenta),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: slide 6s linear infinite;
+}
+
+/* giant faint wordmark bleeding off the bottom */
+.wordmark {
+  position: absolute;
+  left: 50%;
+  bottom: -2.2rem;
+  transform: translateX(-50%);
+  font-family: var(--hl-mono, ui-monospace, monospace);
+  font-weight: 800;
+  font-size: clamp(4rem, 17vw, 15rem);
+  letter-spacing: -0.04em;
+  line-height: 1;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.022);
+  pointer-events: none;
+  user-select: none;
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  padding: 3.5rem var(--ifm-spacing-horizontal) 2rem;
+}
+
+/* ===== CTA band ===== */
+.cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding-bottom: 2.5rem;
+  margin-bottom: 2.5rem;
+  border-bottom: 1px solid var(--f-hair);
+}
+
+.ctaKicker {
+  font-family: var(--hl-mono, ui-monospace, monospace);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  color: var(--f-muted);
+  margin: 0 0 0.5rem;
+}
+
+.ctaTitle {
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--f-txt);
+  margin: 0;
+  line-height: 1.15;
+}
+
+.ctaAccent {
+  background: linear-gradient(100deg, var(--f-lime), var(--f-cyan));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.ctaActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.primaryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.78rem 1.6rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #05060a;
+  background: var(--f-lime);
+  text-decoration: none;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.primaryBtn:hover {
+  transform: translateY(-2px);
+  color: #05060a;
+  text-decoration: none;
+  box-shadow: 0 14px 34px -10px rgba(182, 244, 0, 0.6);
+}
+
+.arrow {
+  transition: transform 0.2s ease;
+}
+
+.primaryBtn:hover .arrow {
+  transform: translateX(4px);
+}
+
+.cmd {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--hl-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+  color: var(--f-txt);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--f-hair);
+  border-radius: 10px;
+  padding: 0.6rem 0.95rem;
+}
+
+.prompt {
+  color: var(--f-lime);
+  font-weight: 700;
+  margin-right: 0.5rem;
+}
+
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  background: var(--f-lime);
+  box-shadow: 0 0 8px var(--f-lime);
+  animation: blink 1s steps(2, start) infinite;
+}
+
+/* ===== Brand + sitemap ===== */
+.grid {
+  display: grid;
+  grid-template-columns: 1.4fr 2fr;
+  gap: 2.5rem;
+  padding-bottom: 2.5rem;
+}
+
+.brandTop {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.logo {
+  border-radius: 7px;
+}
+
+.brandName {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--f-txt);
+}
+
+.tagline {
+  margin: 0.9rem 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--f-muted);
+  max-width: 30ch;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-family: var(--hl-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  color: var(--f-muted);
+}
+
+.meta .dot {
+  opacity: 0.4;
+}
+
+.cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1.5rem;
+}
+
+.colTitle {
+  font-family: var(--hl-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--f-lime);
+  margin: 0 0 0.9rem;
+}
+
+.collist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.collist li {
+  margin-bottom: 0.55rem;
+}
+
+.flink {
+  font-size: 0.86rem;
+  color: var(--f-muted);
+  text-decoration: none;
+  transition:
+    color 0.2s ease,
+    padding-left 0.2s ease;
+  position: relative;
+}
+
+.flink:hover {
+  color: var(--f-txt);
+  text-decoration: none;
+  padding-left: 0.6rem;
+}
+
+.flink::before {
+  content: "→";
+  position: absolute;
+  left: -0.4rem;
+  opacity: 0;
+  color: var(--f-lime);
+  transition: opacity 0.2s ease;
+}
+
+.flink:hover::before {
+  opacity: 1;
+}
+
+/* ===== Bottom bar ===== */
+.bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1.6rem;
+  border-top: 1px solid var(--f-hair);
+  font-family: var(--hl-mono, ui-monospace, monospace);
+  font-size: 0.76rem;
+  color: var(--f-muted);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.status b {
+  color: var(--f-lime);
+  font-weight: 700;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--f-lime);
+  box-shadow: 0 0 0 0 var(--f-lime);
+  animation: pulse 1.8s ease-out infinite;
+}
+
+.copyright {
+  color: var(--f-muted);
+}
+
+/* ===== Keyframes ===== */
+@keyframes slide {
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(182, 244, 0, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(182, 244, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(182, 244, 0, 0);
+  }
+}
+
+/* ===== Responsive ===== */
+@media screen and (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topline,
+  .caret,
+  .statusDot {
+    animation: none;
+  }
+}
