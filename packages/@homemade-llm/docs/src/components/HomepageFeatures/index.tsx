@@ -1,5 +1,4 @@
 import Heading from '@theme/Heading';
-import clsx from 'clsx';
 import type { ReactNode } from 'react';
 
 import styles from './styles.module.css';
@@ -12,22 +11,22 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'ゼロから理解する',
-    emoji: '🧱',
+    title: '原理から理解する',
+    emoji: '🔬',
     description: (
       <>
-        トークナイザーから
-        Transformer、学習ループまで。ライブラリの内部で何が起きているかを、
-        手を動かしながら理解できます。
+        Attention も勾配降下も、数式と動くコードの両輪で。
+        「なぜそう動くのか」を腹落ちさせながら進める。
       </>
     ),
   },
   {
-    title: '実装と解説をセットで',
-    emoji: '💡',
+    title: '手を動かして作る',
+    emoji: '🛠️',
     description: (
       <>
-        理論の解説だけでなく、動くコードと一緒に学べます。読んで終わりではなく、実際に動かして確かめられます。
+        読むだけで終わらせない。各章で実際に実装し、自分のモデルが文章を
+        生成する瞬間まで辿り着く。
       </>
     ),
   },
@@ -36,8 +35,8 @@ const FeatureList: FeatureItem[] = [
     emoji: '🐍',
     description: (
       <>
-        ドキュメントは TypeScript ベースですが、将来的に Python
-        のサンプルコードも扱えるよう設計しています。
+        ドキュメントは TypeScript ベース。将来的には Python のサンプルコードも
+        扱えるよう設計している。
       </>
     ),
   },
@@ -45,16 +44,14 @@ const FeatureList: FeatureItem[] = [
 
 function Feature({ title, emoji, description }: FeatureItem) {
   return (
-    <div className={clsx('col col--4')}>
-      <div className="text--center">
-        <span className={styles.featureEmoji} role="img" aria-label={title}>
-          {emoji}
-        </span>
-      </div>
-      <div className="text--center padding-horiz--md">
-        <Heading as="h3">{title}</Heading>
-        <p>{description}</p>
-      </div>
+    <div className={styles.card}>
+      <span className={styles.emoji} role="img" aria-label={title}>
+        {emoji}
+      </span>
+      <Heading as="h3" className={styles.cardTitle}>
+        {title}
+      </Heading>
+      <p className={styles.cardText}>{description}</p>
     </div>
   );
 }
@@ -63,7 +60,13 @@ export default function HomepageFeatures(): ReactNode {
   return (
     <section className={styles.features}>
       <div className="container">
-        <div className="row">
+        <div className={styles.heading}>
+          <span className={styles.kicker}>WHY BUILD IT</span>
+          <Heading as="h2" className={styles.title}>
+            なぜ、ゼロから作るのか
+          </Heading>
+        </div>
+        <div className={styles.cards}>
           {FeatureList.map((props) => (
             <Feature key={props.title} {...props} />
           ))}

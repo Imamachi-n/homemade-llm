@@ -1,0 +1,244 @@
+.console {
+  width: 100%;
+  max-width: 460px;
+  border-radius: 18px;
+  padding: 1.1rem 1.25rem 1.35rem;
+  background: var(--hl-panel);
+  border: 1px solid var(--hl-panel-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow:
+    0 20px 50px -20px rgba(15, 23, 42, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  font-family: var(--hl-mono);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--hl-cyan);
+  box-shadow: 0 0 0 0 var(--hl-cyan);
+  animation: pulse 1.8s ease-out infinite;
+}
+
+.headerLabel {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+  text-transform: lowercase;
+}
+
+.stream {
+  font-size: 1.02rem;
+  line-height: 1.7;
+  word-break: break-word;
+  min-height: 3.4rem;
+  margin-bottom: 0.9rem;
+}
+
+.seed {
+  opacity: 0.55;
+}
+
+.generated {
+  background: linear-gradient(120deg, var(--hl-indigo), var(--hl-cyan));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+
+.cursor {
+  display: inline-block;
+  width: 0.55ch;
+  height: 1.05em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--hl-violet);
+  animation: blink 1s steps(2, start) infinite;
+}
+
+.predictLabel {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  margin-bottom: 0.55rem;
+}
+
+.candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 4.5rem 1fr 2.6rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.28rem 0.4rem;
+  border-radius: 9px;
+  opacity: 0;
+  animation: slideIn 0.4s ease forwards;
+}
+
+.rowTop {
+  background: linear-gradient(
+    90deg,
+    rgba(99, 102, 241, 0.16),
+    rgba(34, 211, 238, 0.06)
+  );
+}
+
+.token {
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowTop .token {
+  color: var(--hl-indigo);
+}
+
+.barTrack {
+  position: relative;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--hl-grid-line);
+  overflow: hidden;
+}
+
+.barFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--hl-indigo), var(--hl-cyan));
+  width: 0;
+  animation: grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  transform-origin: left;
+}
+
+.row:not(.rowTop) .barFill {
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.7),
+    rgba(148, 163, 184, 0.4)
+  );
+}
+
+.prob {
+  font-size: 0.78rem;
+  text-align: right;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+
+.argmax {
+  position: absolute;
+  top: -0.55rem;
+  right: 0.4rem;
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(90deg, var(--hl-violet), var(--hl-pink));
+}
+
+.done {
+  padding: 0.6rem 0.2rem;
+  animation: slideIn 0.4s ease forwards;
+}
+
+.done code {
+  font-size: 0.95rem;
+  font-weight: 700;
+  background: linear-gradient(
+    120deg,
+    var(--hl-indigo),
+    var(--hl-cyan),
+    var(--hl-violet)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  border: none;
+  padding: 0;
+}
+
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--hl-glow-2);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(34, 211, 238, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 211, 238, 0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* barFill は width をインライン指定し、scaleX で伸ばす */
+.barFill {
+  transform: scaleX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot,
+  .cursor,
+  .row,
+  .barFill,
+  .done {
+    animation: none;
+  }
+  .barFill {
+    transform: scaleX(1);
+  }
+  .row {
+    opacity: 1;
+  }
+}
