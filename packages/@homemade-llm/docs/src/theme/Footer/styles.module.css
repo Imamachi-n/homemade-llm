@@ -231,7 +231,9 @@
 }
 
 .flink {
+  display: inline-block;
   font-size: 0.86rem;
+  line-height: 1.5;
   color: var(--f-muted);
   text-decoration: none;
   transition:
@@ -250,6 +252,8 @@
   content: "→";
   position: absolute;
   left: -0.4rem;
+  top: 0;
+  line-height: 1.5;
   opacity: 0;
   color: var(--f-lime);
   transition: opacity 0.2s ease;

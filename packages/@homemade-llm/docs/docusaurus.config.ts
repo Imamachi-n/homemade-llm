@@ -191,12 +191,8 @@ const config: Config = {
           title: 'LLM アーキテクチャ',
           items: [
             {
-              label: 'StripedHyena 2: 概要',
-              to: '/docs/llm-architecture/stripedhyena2/overview',
-            },
-            {
-              label: 'ハードウェア対応カーネル',
-              to: '/docs/llm-architecture/stripedhyena2/hardware-algorithms',
+              label: 'StripedHyena 2',
+              to: '/docs/category/stripedhyena-2畳み込みマルチハイブリッド',
             },
           ],
         },
