@@ -136,6 +136,7 @@ Evo 2 は、同じ研究グループによる前世代モデル **Evo 1**（Nguy
 | [04. 機構的解釈可能性](./04-interpretability.md) | Feature interpretation | SAE による特徴抽出 |
 | [05. ゲノムスケール生成](./05-generation.md) | Genome-scale generation | ミトコンドリア・細菌・酵母ゲノム生成 |
 | [06. クロマチン設計と考察](./06-chromatin-design.md) | Chromatin design / Discussion | 推論時ガイダンス・安全性・展望 |
+| [07. バイオセーフティと責任ある公開（付録）](./07-biosafety.md) | Extended Data Fig. 2 / Discussion | ウイルス除外の検証・レッドチーミング・集団バイアス |
 
 :::info[公開リソース]
 
