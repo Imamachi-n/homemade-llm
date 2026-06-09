@@ -145,7 +145,53 @@ GPU のテンソルコアは **密な行列積（GEMM）** に特化したユニ
   <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>演算子別スループットの概念図（H100・幅4096）。Hyena-SE/MR が attention・SSM 系を上回る（論文 Fig. 3.2・B.4 の趣旨）</figcaption>
 </figure>
 
-## 6. まとめ
+## 6. 計算コストと chunk 方向の並列化
+
+[03](./03-architecture-scaling.md) のグループ化は「チャネル方向」に GEMM をまとめる方法でした。論文の付録では、**グループ化なしでも GEMM 化する別アプローチ**——**チャンク方向に並列化** する方法も示されています。
+
+各出力チャンクは $\hat{Y}_n = H_0\hat{X}_n + H_1\hat{X}_{n-1}$ で、$H_0, H_1$ は全チャンクで不変です。そこで GPU カーネルは次の手順を取ります。
+
+1. **フィルタ preload**：$H_0, H_1$ をオンチップメモリ（共有メモリ）に一度だけロードし、全チャンクで再利用。
+2. **チャンク読み込み**：現在チャンク $\hat{X}_n$（と前チャンク $\hat{X}_{n-1}$）をレジスタ／共有メモリへ。
+3. **テンソルコア GEMM**：$H_0\hat{X}_n$ と $H_1\hat{X}_{n-1}$ を計算し、$\hat{Y}_n$ に累積。
+4. **書き戻し**：$\hat{Y}_n$ をグローバルメモリへ。
+
+**計算コスト（cost model）** も明快です。各チャンクは $(\ell_b\times\ell_b)\times(\ell_b\times d)$ の GEMM を2回、すなわち $2\ell_b^2 d$ FLOPS。系列全体（$\lceil\ell/\ell_b\rceil$ チャンク）では、
+
+$$
+2\,\ell_b^2\, d\, \left\lceil \frac{\ell}{\ell_b} \right\rceil \ \text{FLOPS}
+$$
+
+フィルタが短い（$\ell_h \le 2\ell_b$）ため $H_2$ 以降のオフ対角ブロックが現れず、この見積もりで収まります。系列長 $\ell$ に対して**線形**（チャンク数に比例）であり、Attention の $O(\ell^2)$ と対照的です。
+
+## 7. 逆伝播：two-pass backward カーネル
+
+学習には逆伝播が必要ですが、**フィルタの勾配計算は「全体での累積（global accumulation）」** を要します（同じフィルタが全位置で共有されるため）。これを1つのカーネルに詰め込むと非効率なので、論文は **2段（two-pass）の back-to-back カーネル** で実装します。
+
+1. **1段目**：forward と同じブロック構造を保ったまま、**ブロックごとに部分的なフィルタ勾配を累積**。
+2. **2段目**：部分勾配を **reduction（集約）** して最終的なフィルタ勾配を得る。
+
+ポイントは、1段目で部分勾配を **coalesced（連続した）形式** で書き出すこと。これにより2段目を単純なベクトル化 reduction にできます。
+
+また、Toeplitz 因子 $H_0, H_1$ は **その場で効率的に生成（materialize）** します。前述の2段階分解で見た Toeplitz 行列を、メモリ上に陽に展開せず、**行・列インデックスの差からフィルタ係数を引くだけ** で構築できます（Triton カーネルの例）。
+
+```python
+import triton
+import triton.language as tl
+
+@triton.jit
+def load_toeplitz(h_ptr, FILTER_LEN: tl.constexpr, CHUNK_SIZE: tl.constexpr):
+    # 行 r と列 c のインデックス差 (r - c) が、そのセルが参照するフィルタ係数の添字
+    r = tl.arange(FILTER_LEN - 1, CHUNK_SIZE + FILTER_LEN - 1)[None, :]
+    c = tl.arange(0, CHUNK_SIZE)[:, None]
+    idx = r - c
+    mask = (idx >= 0) & (idx < FILTER_LEN)         # フィルタ範囲外は 0 埋め
+    return tl.load(h_ptr + idx, mask=mask, other=0.0)
+```
+
+「インデックス差がフィルタ係数の添字になる」のは、まさに Toeplitz 行列が **対角方向に同じ値が並ぶ** 性質そのものです。陽に行列を作らずインデックス計算で済むので、メモリと帯域を節約できます。
+
+## 8. まとめ
 
 - 畳み込みは **Toeplitz 行列の積**。SE/MR は $\ell_h \le 2\ell_b$ なら **2段階（$H_0$＋$H_1$）** に分解できる。
 - $\hat{Y}_n = H_0\hat{X}_n + H_1\hat{X}_{n-1}$ という **2つの GEMM** に落ち、$H_0/H_1$ の再利用とグループ化で **テンソルコアをフル活用**。

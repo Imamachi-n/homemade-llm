@@ -127,7 +127,13 @@ $$
 
 ## 4. FIR フィルタと効率的な生成
 
-Hyena-SE と Hyena-MR のフィルタは **FIR（有限インパルス応答, finite-impulse response）** です。フィルタ長が有限なので、**自己回帰生成のときに過去の有限個の要素だけ保持すればよく、定数メモリ** で済みます（sliding window attention と同様）。Hyena-LI も、前述のとおり再帰的パラメータ化に切り替えれば定数メモリで生成できます。
+Hyena-SE と Hyena-MR のフィルタは **FIR（有限インパルス応答, finite-impulse response）** です。長さ $\ell_h$ の FIR フィルタ $h$ による因果畳み込みは、
+
+$$
+y_t = \sum_{k=0}^{\ell_h - 1} h_k\, x_{t-k}
+$$
+
+と書けます。出力 $y_t$ が **過去 $\ell_h$ 個の入力だけに依存** するのがポイントです。フィルタ長が有限なので、**自己回帰生成のときも直近 $\ell_h$ 個の要素を保持すればよく、定数メモリ** で済みます（sliding window attention と同様）。この $y_t = \sum_k h_{t-k} x_k$ という形が、[04. ハードウェア対応カーネル](./04-hardware-algorithms.md)で Toeplitz 行列の積として高速化されます。Hyena-LI も、前述のとおり再帰的パラメータ化に切り替えれば定数メモリで生成できます。
 
 :::tip[LLM とのつながり：効率化アーキの「いいとこ取り」]
 

@@ -102,7 +102,8 @@ title: "01. 概要：なぜマルチハイブリッドか"
 | [02. 3つの Hyena 演算子](./02-operators.md) | §2.1 | Hyena 構造の数式・SE/MR/LI の設計 |
 | [03. アーキテクチャ設計とスケーリング](./03-architecture-scaling.md) | §2.2–2.3 | block layout・filter grouping・文脈拡張・スループット |
 | [04. ハードウェア対応カーネル](./04-hardware-algorithms.md) | §3 | Toeplitz・block convolution・two-stage・tensor core |
-| [05. 長系列の分散学習](./05-context-parallelism.md) | §4・付録 | a2a/p2p・FFT 畳み込み・Radix-N・butterfly |
+| [05. 長系列の分散学習](./05-context-parallelism.md) | §4・付録 | a2a/p2p・ring attention・FFT 畳み込み・zig-zag |
+| [06. FFT 畳み込みの数学（付録）](./06-fft-convolutions.md) | 付録 A.2–A.3 | DFT→FFT 導出・butterfly・Radix-N・分散 p2p FFT |
 
 :::info[公開リソース]
 
