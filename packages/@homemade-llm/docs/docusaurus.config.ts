@@ -175,6 +175,32 @@ const config: Config = {
           ],
         },
         {
+          title: '生物学における LLM の応用事例',
+          items: [
+            {
+              label: 'なぜ生物学で LLM なのか',
+              to: '/docs/biology-llm-applications/intro',
+            },
+            {
+              label: 'Evo 2: ゲノム基盤モデル',
+              to: '/docs/biology-llm-applications/evo2/overview',
+            },
+          ],
+        },
+        {
+          title: 'LLM アーキテクチャ',
+          items: [
+            {
+              label: 'StripedHyena 2: 概要',
+              to: '/docs/llm-architecture/stripedhyena2/overview',
+            },
+            {
+              label: 'ハードウェア対応カーネル',
+              to: '/docs/llm-architecture/stripedhyena2/hardware-algorithms',
+            },
+          ],
+        },
+        {
           title: 'More',
           items: [
             {

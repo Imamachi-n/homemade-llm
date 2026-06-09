@@ -100,7 +100,7 @@ StripedHyena 2 は、距離スケールの異なる **3種類の Hyena 演算子
 
 :::tip[LLM とのつながり：Attention 一辺倒からの脱却]
 
-「Transformer の Attention を別の演算子で置き換えて長文脈を効率化する」という流れは、自然言語 LLM でも State Space Model（Mamba など）やハイブリッドモデルとして活発に研究されています。Evo 2 はこの系譜の **Hyena 系ハイブリッド** を、ゲノムという超長文脈ドメインで大規模に実証した例と言えます。アーキテクチャの詳細は姉妹論文 Ku et al.（arXiv:2503.01868）にまとまっています。
+「Transformer の Attention を別の演算子で置き換えて長文脈を効率化する」という流れは、自然言語 LLM でも State Space Model（Mamba など）やハイブリッドモデルとして活発に研究されています。Evo 2 はこの系譜の **Hyena 系ハイブリッド** を、ゲノムという超長文脈ドメインで大規模に実証した例と言えます。アーキテクチャの詳細は、本サイトの [StripedHyena 2 詳解](../../llm-architecture/stripedhyena2/01-overview.md)（姉妹論文 Ku et al., arXiv:2503.01868）で深掘りしています。
 
 :::
 

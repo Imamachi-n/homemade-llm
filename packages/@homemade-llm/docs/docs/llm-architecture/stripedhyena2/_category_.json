@@ -1,0 +1,8 @@
+{
+  "label": "StripedHyena 2：畳み込みマルチハイブリッド",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "description": "論文「Systems and Algorithms for Convolutional Multi-Hybrid Language Models at Scale」(Ku, Nguyen, Romero et al., 2025) を、アーキテクチャ設計・ハードウェア対応カーネル・分散学習の各側面から詳細に解説します。Evo 2 を支える基盤技術です。"
+  }
+}

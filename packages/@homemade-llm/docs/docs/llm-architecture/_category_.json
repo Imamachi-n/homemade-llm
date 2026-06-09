@@ -1,0 +1,8 @@
+{
+  "label": "LLM アーキテクチャ",
+  "position": 5,
+  "link": {
+    "type": "generated-index",
+    "description": "Transformer に代わる・あるいはそれを補完する効率的な LLM アーキテクチャを、最先端の論文を通じて詳細に解説するセクションです。長文脈・高スループットを実現する設計の中身に踏み込みます。"
+  }
+}
