@@ -1,0 +1,8 @@
+{
+  "label": "AlphaGenome（DeepMind, Nature 2026）",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "description": "Google DeepMind が Nature 2026 に発表した、DNA 配列から数千の機能ゲノミクス・トラックを単一塩基解像度で予測する統合モデル AlphaGenome を、論文のセクションごとに極めて詳細に解説します。配列を入力に機能を出力する『sequence-to-function』モデルであり、自己回帰のゲノム言語モデル（Evo 2）とは別パラダイムの応用例です。"
+  }
+}

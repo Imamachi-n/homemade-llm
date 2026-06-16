@@ -11,7 +11,7 @@ title: "なぜ生物学で LLM なのか"
 
 :::tip[このセクションの位置づけ]
 
-[基礎知識](../foundations/chapter1.md) と [LLM をゼロから作る](../llm-from-scratch/chapter1.md) では、Transformer や自己回帰学習といった **LLM の土台技術** を学びました。本セクションは、その技術が **実世界の科学（生物学）でどう応用されているか** を示す応用編です。第1弾として、Nature 2026 に掲載されたゲノム基盤モデル **[Evo 2](./evo2/01-overview.md)** を、論文のセクションごとに極めて詳細に解説します。
+[基礎知識](../foundations/chapter1.md) と [LLM をゼロから作る](../llm-from-scratch/chapter1.md) では、Transformer や自己回帰学習といった **LLM の土台技術** を学びました。本セクションは、その技術が **実世界の科学（生物学）でどう応用されているか** を示す応用編です。題材は、いずれも Nature 2026 に掲載された2つのゲノム基盤モデル——配列を**生成**するゲノム言語モデル **[Evo 2](./evo2/01-overview.md)** と、配列から**機能を予測**する sequence-to-function モデル **[AlphaGenome](./alphagenome/01-overview.md)**——を、論文のセクションごとに極めて詳細に解説します。
 
 :::
 
@@ -88,7 +88,16 @@ $x_i$ が「単語」なら自然言語モデル、「塩基」ならゲノム�
 
 ## 4. このセクションの読み方
 
-第1弾の題材は、**Arc Institute・Stanford・NVIDIA** らが開発し Nature 2026 に発表した **Evo 2** です。Evo 2 の解説は、論文の構成に沿って次の6ページに分けています。
+本セクションでは、2つの論文を題材にします。立ち位置の違いを押さえてから読むと、理解が深まります。
+
+| モデル | 開発元 | パラダイム | ひとことで |
+| --- | --- | --- | --- |
+| **Evo 2** | Arc Institute・Stanford・NVIDIA ほか | 自己回帰ゲノム言語モデル | 次の塩基を予測 → 変異予測・配列**生成** |
+| **AlphaGenome** | Google DeepMind | sequence-to-function（教師あり回帰） | 配列から実験トラックを**予測** → 非コード変異の機能解釈 |
+
+### 第1弾：Evo 2
+
+**Arc Institute・Stanford・NVIDIA** らが開発した **Evo 2** です。論文の構成に沿って次の7ページに分けています。
 
 1. [概要と全体像](./evo2/01-overview.md) — 論文の要旨・貢献・モデルの全体像
 2. [アーキテクチャと学習・データ](./evo2/02-architecture.md) — StripedHyena 2・OpenGenome2・2段階学習
@@ -96,6 +105,19 @@ $x_i$ が「単語」なら自然言語モデル、「塩基」ならゲノム�
 4. [機構的解釈可能性](./evo2/04-interpretability.md) — SAE でモデルの「概念」を取り出す
 5. [ゲノムスケール生成](./evo2/05-generation.md) — 細菌・ミトコンドリア・酵母ゲノムの生成
 6. [クロマチン設計と考察](./evo2/06-chromatin-design.md) — 推論時ガイダンスによる設計と Discussion
+7. [バイオセーフティと責任ある公開](./evo2/07-biosafety.md) — ウイルス除外の検証・レッドチーミング
+
+### 第2弾：AlphaGenome
+
+**Google DeepMind** が開発した **AlphaGenome** です。1 Mb の DNA から数千の機能ゲノミクス・トラックを単一塩基解像度で予測し、非コード変異の機能的影響を多モダリティで解釈します。次の7ページに分けています。
+
+1. [概要と全体像](./alphagenome/01-overview.md) — 要旨・2つのトレードオフ・Evo 2 との違い
+2. [アーキテクチャと学習](./alphagenome/02-architecture.md) — U-Net＋Transformer・配列並列・事前学習＋蒸留
+3. [トラック予測性能](./alphagenome/03-track-prediction.md) — 未知領域での汎化・Pearson r・スプライシング
+4. [スプライシング変異の予測](./alphagenome/04-splicing-variants.md) — スプライスジャンクション・複合スコアラー
+5. [発現・遠位制御の変異](./alphagenome/05-expression-variants.md) — eQTL・GWAS・エンハンサー連結・paQTL
+6. [クロマチン変異と MPRA](./alphagenome/06-chromatin-variants.md) — caQTL/bQTL・ISM モチーフ・CAGI5
+7. [多モダリティ統合・アブレーション・考察](./alphagenome/07-multimodal-ablations.md) — TAL1・設計選択の寄与・限界と展望
 
 :::info[対象読者と方針]
 
