@@ -11,7 +11,7 @@ title: "なぜ生物学で LLM なのか"
 
 :::tip[このセクションの位置づけ]
 
-[基礎知識](../foundations/chapter1.md) と [LLM をゼロから作る](../llm-from-scratch/chapter1.md) では、Transformer や自己回帰学習といった **LLM の土台技術** を学びました。本セクションは、その技術が **実世界の科学（生物学）でどう応用されているか** を示す応用編です。題材は、いずれも Nature 2026 に掲載された2つのゲノム基盤モデル——配列を**生成**するゲノム言語モデル **[Evo 2](./evo2/01-overview.md)** と、配列から**機能を予測**する sequence-to-function モデル **[AlphaGenome](./alphagenome/01-overview.md)**——を、論文のセクションごとに極めて詳細に解説します。
+[LLM を作って理解する](../llm-textbook/chapter1.md) では、Transformer や自己回帰学習といった **LLM の土台技術** を学びました。本セクションは、その技術が **実世界の科学（生物学）でどう応用されているか** を示す応用編です。題材は、いずれも Nature 2026 に掲載された2つのゲノム基盤モデル——配列を**生成**するゲノム言語モデル **[Evo 2](./evo2/01-overview.md)** と、配列から**機能を予測**する sequence-to-function モデル **[AlphaGenome](./alphagenome/01-overview.md)**——を、論文のセクションごとに極めて詳細に解説します。
 
 :::
 

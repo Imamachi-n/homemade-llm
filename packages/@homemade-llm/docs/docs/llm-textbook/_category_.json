@@ -1,0 +1,8 @@
+{
+  "label": "LLM を作って理解する",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "description": "数学の基礎から始めて、Transformer・トークナイザー・学習ループへと、LLM を一歩ずつ作りながら理解していくセクションです。"
+  }
+}

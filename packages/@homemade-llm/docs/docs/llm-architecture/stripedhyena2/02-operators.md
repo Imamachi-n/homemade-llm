@@ -9,7 +9,7 @@ StripedHyena 2 の心臓部は、**入力依存の畳み込み（input-dependent
 
 ## 1. 入力依存の畳み込みという発想
 
-Self-Attention は、全トークン対の関連度を $QK^\top$ で計算します（[Transformer の実装](../../llm-from-scratch/chapter2.md)参照）。これは強力ですが $O(n^2)$ です。
+Self-Attention は、全トークン対の関連度を $QK^\top$ で計算します（[Transformer](../../llm-textbook/chapter2.md)参照）。これは強力ですが $O(n^2)$ です。
 
 Hyena の発想は、**「全対比較」の代わりに、長い畳み込みフィルタとゲーティングで系列を混ぜる** ことです。畳み込みは高速フーリエ変換（FFT）を使えば $O(n \log n)$、フィルタが短ければさらに軽く計算できます。鍵は、フィルタを **入力に応じて変調する（ゲーティングする）** ことで、固定フィルタの CNN にはない表現力を得る点です。
 

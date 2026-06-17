@@ -100,7 +100,7 @@ function HomepageHero() {
             </Link>
             <Link
               className={styles.ghostBtn}
-              to="/docs/llm-from-scratch/chapter1"
+              to="/docs/llm-textbook/chapter1"
             >
               <span className={styles.prompt}>$</span> ゼロから作る
             </Link>

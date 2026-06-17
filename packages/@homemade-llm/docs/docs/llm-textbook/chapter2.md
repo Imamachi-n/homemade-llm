@@ -1,17 +1,17 @@
 ---
 sidebar_position: 2
-title: "Chapter 2: Transformer とは何か"
+title: "Chapter 2: Transformer"
 ---
 
-# Chapter 2: Transformer とは何か
+# Chapter 2: Transformer
 
-[前章](./chapter1.md)では、ベクトル・内積・行列積・softmax といった「LLM を支える数学」を積み上げました。この章では、いよいよその数学が組み上がってできる主役、**Transformer（トランスフォーマー）** の正体に迫ります。
+[前章](./chapter1.md)では、ベクトル・内積・行列積・softmax といった「LLM を支える数学」を積み上げました。この章では、いよいよその数学が組み上がってできる主役、**Transformer（トランスフォーマー）** に迫ります。
 
-まずは「そもそも Transformer って何なの？」を一言でつかみ、次に「なぜそんなものが必要だったのか」という背景、そして Transformer の心臓部である **Attention（注意機構）** を、前章の数学とつなげながら見ていきます。
+この章は **前半（概念）→ 後半（実装）** の2部構成です。まず「そもそも Transformer って何なの？」「なぜ必要だったのか」をつかみ、心臓部の **Attention（注意機構）** の仕組みを前章の数学とつなげて理解します。そのうえで後半では、その Attention を **実際に数値とコードで計算**し、手を動かしながら腑に落とします。
 
 :::tip[この章の読み方]
 
-数式や用語が出てきても身構えなくて大丈夫です。新しい記号や式は **使う直前に意味を渡します**。特に Attention は「前章で学んだ内積・softmax をくり返しているだけ」だと分かると、一気に見通しが良くなります。
+数式や用語が出てきても身構えなくて大丈夫です。新しい記号や式は **使う直前に意味を渡します**。特に Attention は「前章で学んだ内積・softmax をくり返しているだけ」だと分かると、一気に見通しが良くなります。後半の実装も、前半で理解した3ステップをそのままコードにするだけです。
 
 :::
 
@@ -290,7 +290,7 @@ Query と Key の次元 $d_k$ が大きいほど、内積はたくさんの項�
   <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>Multi-Head Attention：複数の頭が別々の観点で注目し、最後に統合する</figcaption>
 </figure>
 
-:::tip[ここまでのまとめ]
+:::tip[前半（概念）のまとめ]
 
 - Transformer は「全単語ペアの注目度を一気に計算する」アーキテクチャで、いまの LLM の土台。
 - RNN の「遅い・遠い単語を忘れる」を、「順番に読むのをやめる」ことで解決した。
@@ -301,4 +301,280 @@ Query と Key の次元 $d_k$ が大きいほど、内積はたくさんの項�
 
 ---
 
-この章では Transformer の正体と、心臓部 Attention の仕組みをつかみました。次の節以降では、これらのブロックがどう積み重なって1つのモデルになるのか——位置エンコーディング、残差接続、フィードフォワード層、そしてエンコーダ／デコーダといった全体像——を見ていきます。
+ここまでで、Attention が「**内積 → softmax → 加重和**」の3ステップでできていることが分かりました。**ここからは後半（実装）パート**です。その3ステップを、実際の数値で手を動かし、最後は Python（NumPy）で実装して確かめます。ゴールは1つ。**アテンション機構の出力 $o$ を自分の手で計算できるようになること**です。
+
+:::note[ここからは実践パート]
+
+仕組みは前半でつかんだので、後半は「**結局どう計算するのか／コードでどう書くのか**」に集中します。手元で動かしたいときは [Google Colab](https://colab.research.google.com/?hl=ja) が手軽です（`pip install numpy` だけで動きます）。
+
+:::
+
+## 4. 注目度から出力 $o$ までを計算する
+
+### 4.1 注目度 $a_i$ を「計算する形」に書き下す
+
+前半の 3 節では、クエリ $q$ とキー $k_i$ の内積を softmax に通したものが注目度になる、と見ました。計算に移る前に、これを1つの式として書いておきます。キーが全部で $n$ 個あるとして、スコアは内積 $a'_i = q\,k_i^{\top}$、それを softmax に通した各成分を $a_i$ と書くと、
+
+$$
+a_i = \frac{\exp(q k_i^{\top})}{\sum_{j} \exp(q k_j^{\top})}
+$$
+
+これが **クエリ $q$ の、キー $k_i$ に対する注目度**です。各 $a_i$ は **スカラ（ただの1つの数）** で、$0 \le a_i \le 1$、かつ $a_1 + a_2 + \dots + a_n = 1$ を満たします。「どの位置をどれくらい重視するか」を表す割合だと思ってください。
+
+### 4.2 バリューベクトル $v$ を用意する
+
+出力を求めるには、前半 3.2 で出てきた **バリューベクトル** $v$（実際に受け取る中身の情報）を、いよいよ式に登場させます。本来は Key とは別物ですが、計算を追いやすくするため、この章の範囲では、
+
+$$
+\text{バリューベクトル } v = \text{キーベクトル } k
+$$
+
+とします。つまり $v_i = k_i$。いったんは「キーと同じものをもう一度使うだけ」と思っておけば十分です。
+
+:::note[なぜ Value を別に呼ぶの？]
+
+本来 Attention では Key（関連度を測る見出し）と Value（実際に渡す中身）は別々の役割を持ち、一般には $v_i \ne k_i$ です（前半 3.2 の図書館のたとえを思い出してください）。ただ計算を最初に追う段階では、両者を同じにしておくと式が見通しやすくなります。この章では $v_i = k_i$ で進め、両者を分ける一般形は後の章で扱います。
+
+:::
+
+### 4.3 出力 $o$ は「Value の加重和」
+
+アテンション機構の出力 $o$ は、各バリューベクトル $v_i$ を注目度 $a_i$ で重みづけして、すべて足し合わせたものです。
+
+$$
+o = a_1 v_1 + a_2 v_2 + \dots + a_n v_n
+$$
+
+$o$ は $v$ と同じ次元数のベクトルになります（スカラ × ベクトルを足しているだけなので、次元は変わりません）。
+
+やっていることを一言で言うと、これだけです。
+
+> **$i$ 番目のバリューベクトルを、$i$ 番目の注目度倍して、全部足す。**
+
+- 注目度が大きいもの ＝ クエリと強く関連しているもの。
+- 注目度が大きい Value は $o$ に強く反映され、注目度がゼロに近い Value はほとんど無視される。
+
+つまり $o$ とは、
+
+> **クエリ $q$ が入力されたときの、$q$ に関連のある内容を強く反映した「新しいベクトル表現」**
+
+なのです。前半 3.3 の「それ → 動物」の例で言えば、出力 $o$ は「動物」の情報を濃く受け取ったベクトルになります。
+
+<figure style={{margin: '1.25rem auto', textAlign: 'center', maxWidth: '460px'}}>
+  <svg viewBox="0 0 420 180" width="420" role="img" aria-label="出力 o は各バリューベクトルを注目度で重みづけして足し合わせたもの">
+    <text x="60" y="22" fontSize="11" fill="currentColor" textAnchor="middle" fillOpacity="0.75">注目度 × Value</text>
+    <rect x="20" y="34" width="80" height="22" rx="3" fill="#3B82F6" fillOpacity="0.30" stroke="#3B82F6" strokeOpacity="0.65" strokeWidth="1.2" />
+    <text x="60" y="49" fontSize="10" fill="currentColor" textAnchor="middle">0.665 · v₁</text>
+    <rect x="20" y="78" width="26" height="22" rx="3" fill="#10B981" fillOpacity="0.22" stroke="#10B981" strokeOpacity="0.55" strokeWidth="1.1" />
+    <text x="60" y="93" fontSize="10" fill="currentColor" textAnchor="middle">0.090 · v₂</text>
+    <rect x="20" y="122" width="42" height="22" rx="3" fill="#EF4444" fillOpacity="0.22" stroke="#EF4444" strokeOpacity="0.55" strokeWidth="1.1" />
+    <text x="60" y="137" fontSize="10" fill="currentColor" textAnchor="middle">0.245 · v₃</text>
+    <text x="150" y="92" fontSize="22" fill="currentColor" textAnchor="middle" fillOpacity="0.7">+</text>
+    <line x1="175" y1="89" x2="245" y2="89" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1.6" markerEnd="url(#arrowO)" />
+    <defs>
+      <marker id="arrowO" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="currentColor" fillOpacity="0.6" />
+      </marker>
+    </defs>
+    <rect x="250" y="74" width="90" height="32" rx="4" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeOpacity="0.55" strokeWidth="1.3" />
+    <text x="295" y="95" fontSize="13" fill="currentColor" textAnchor="middle">出力 o</text>
+    <text x="295" y="128" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.8">≈ v₁ に近いベクトル</text>
+  </svg>
+  <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>注目度が高い v₁ の成分が濃く混ざり、出力 o は v₁ に引き寄せられる（数値は次節 4.4 の計算例）</figcaption>
+</figure>
+
+### 4.4 ダミーの数値で計算してみる
+
+言葉だけだとピンとこないので、小さな例で最後まで計算してみましょう。3 次元のベクトルで、キーは 3 個（$n=3$）とします。$v_i = k_i$ でしたね。
+
+$$
+q = (1,\ 0,\ 1), \quad
+k_1 = (1,\ 0,\ 1), \quad
+k_2 = (0,\ 1,\ 0), \quad
+k_3 = (1,\ 1,\ 0)
+$$
+
+**ステップ① 内積でスコア $a'_i = q k_i^{\top}$ を出す**
+
+$$
+a'_1 = 1{\cdot}1 + 0{\cdot}0 + 1{\cdot}1 = 2, \quad
+a'_2 = 1{\cdot}0 + 0{\cdot}1 + 1{\cdot}0 = 0, \quad
+a'_3 = 1{\cdot}1 + 0{\cdot}1 + 1{\cdot}0 = 1
+$$
+
+$q$ と向きがそっくりな $k_1$ がいちばん高いスコア（2）になりました。
+
+**ステップ② softmax で注目度 $a_i$ にする**
+
+$\exp(2) \approx 7.389,\ \exp(0) = 1,\ \exp(1) \approx 2.718$、合計は $\approx 11.107$ なので、
+
+$$
+a_1 = \frac{7.389}{11.107} \approx 0.665, \quad
+a_2 = \frac{1.000}{11.107} \approx 0.090, \quad
+a_3 = \frac{2.718}{11.107} \approx 0.245
+$$
+
+合計はちゃんと 1（$0.665 + 0.090 + 0.245 = 1.000$）になっています。
+
+**ステップ③ Value の加重和で出力 $o$ を作る**
+
+$$
+\begin{aligned}
+o &= 0.665\,(1,0,1) + 0.090\,(0,1,0) + 0.245\,(1,1,0) \\
+  &= (0.665 + 0 + 0.245,\quad 0 + 0.090 + 0.245,\quad 0.665 + 0 + 0) \\
+  &\approx (0.910,\ 0.335,\ 0.665)
+\end{aligned}
+$$
+
+できました！　出力 $o \approx (0.910,\ 0.335,\ 0.665)$ は、最も注目された $k_1 = (1,0,1)$ にかなり近いベクトルになっています。「$q$ に関連のある内容を強く反映した新しい表現」という説明が、数値でも確かめられました。
+
+## 5. 行列で一気に書く
+
+$n$ 個のキー・バリューを縦に積んで行列 $K, V$ にまとめると、ステップ①〜③の足し算をすべて **行列積1本ずつ**にまとめられます。
+
+$$
+o = \text{softmax}(q K^{\top})\, V
+$$
+
+足し算の記号 $\sum$ が消えているのがポイントです。$qK^{\top}$ が全キーとの内積（スコア $a'_1, \dots, a'_n$）を一括で計算し、最後の $V$ との積が加重和（$\sum_i a_i v_i$）をまとめて行ってくれます。
+
+| 式の部分 | 対応するステップ | 中身 |
+| --- | --- | --- |
+| $q K^{\top}$ | ① スコア | 全キーとの内積をまとめて計算 |
+| $\text{softmax}(\cdots)$ | ② 注目度 | スコアを合計1の注目度へ |
+| $(\cdots)\,V$ | ③ 出力 | 注目度を重みに Value を加重和 |
+
+:::note[前半の式とのちがい：$\sqrt{d_k}$]
+
+前半 3.4 で出てきた式 $\text{softmax}\!\left(\frac{QK^{\top}}{\sqrt{d_k}}\right)V$ には $\sqrt{d_k}$ で割る項がありました。ここではまず **割らない素朴な形**で計算の流れをつかみ、7 節でこのスケーリングを足します。
+
+:::
+
+:::tip[これが「速い」の正体]
+
+ステップ①〜③をループで1個ずつ回す代わりに、行列積で一気に計算できる——これが前半で触れた「全単語ペアを並列に処理できる」という Transformer の強みそのものです。次の実装でも、ループ版と行列版の両方を書いて、結果が一致することを確かめます。
+
+:::
+
+## 6. NumPy で実装する
+
+それでは、5 節までの計算をそのままコードにします。Colab や手元の Python で動かしてみてください。
+
+**コード 2.1：入力ベクトルを用意する**
+
+```python
+import numpy as np
+
+# クエリ（1個）とキー（3個）。本章では Value = Key とする。
+q = np.array([1.0, 0.0, 1.0])
+K = np.array([
+    [1.0, 0.0, 1.0],   # k1
+    [0.0, 1.0, 0.0],   # k2
+    [1.0, 1.0, 0.0],   # k3
+])
+V = K  # バリューベクトル = キーベクトル
+```
+
+**コード 2.2：スコア $a' = qK^{\top}$ を計算する**
+
+```python
+scores = q @ K.T          # 内積をまとめて計算 → [2.0, 0.0, 1.0]
+print(scores)
+```
+
+`@` は行列積（ベクトルどうしなら内積）の演算子です。手計算の $a'_1, a'_2, a'_3 = 2, 0, 1$ と一致します。
+
+**コード 2.3：softmax で注目度にする**
+
+```python
+def softmax(x):
+    e = np.exp(x - np.max(x))   # オーバーフロー防止に最大値を引く
+    return e / e.sum()
+
+a = softmax(scores)         # → [0.665, 0.090, 0.245]
+print(a, a.sum())           # 合計は 1.0
+```
+
+:::note[なぜ最大値を引くの？]
+
+数学的には $\text{softmax}(x)$ と $\text{softmax}(x - c)$ は完全に同じ値になります（分子・分母に同じ $\exp(-c)$ が掛かって打ち消し合うため）。一方コンピュータでは $\exp$ が大きな入力で簡単にオーバーフローするので、$c = \max(x)$ を引いて指数を $0$ 以下に抑えるのが定番のテクニックです。結果は変わらず、計算だけ安定します。
+
+:::
+
+**コード 2.4：出力 $o$ を加重和で求める**
+
+```python
+o = a @ V                   # softmax(qKᵀ)V を1行で
+print(o)                    # → [0.910, 0.335, 0.665]
+```
+
+手計算で出した $o \approx (0.910,\ 0.335,\ 0.665)$ とぴたり一致します🎉
+
+<details>
+<summary>ループ版とまとめて答え合わせ（クリックで開く）</summary>
+
+行列版が正しいことを、定義どおりのループ版と比べて確認します。
+
+```python
+# ループ版：o = Σ aᵢ vᵢ
+o_loop = np.zeros_like(V[0])
+for i in range(len(V)):
+    o_loop += a[i] * V[i]
+
+print(np.allclose(o_loop, a @ V))   # True
+```
+
+`np.allclose` が `True` を返せば、ループ版と行列版の出力が（浮動小数点の誤差の範囲で）一致しているということです。
+
+</details>
+
+## 7. （発展）スケール化内積アテンション
+
+最後に、前半 3.4 で出てきた **$\sqrt{d_k}$ で割るスケーリング**を実装に足します。スコアをキーの次元数 $d_k$ の平方根で割るだけです。
+
+$$
+o = \text{softmax}\!\left(\frac{q K^{\top}}{\sqrt{d_k}}\right) V
+$$
+
+これが **スケール化内積アテンション（Scaled Dot-Product Attention）** で、実用上はこちらが標準形です（$d_k$ が大きいときに softmax が極端に偏るのを防ぐ、というのが理由でした）。
+
+実装は 6 節にわり算を1つ足すだけです。Query が複数（行列 $Q$）になっても、同じ式がそのまま動きます。
+
+```python
+def softmax_rows(x):
+    e = np.exp(x - np.max(x, axis=-1, keepdims=True))
+    return e / e.sum(axis=-1, keepdims=True)
+
+def scaled_dot_product_attention(Q, K, V):
+    d_k = K.shape[-1]
+    scores = Q @ K.T / np.sqrt(d_k)          # スケール化したスコア
+    weights = softmax_rows(scores)           # 行ごとに softmax
+    return weights @ V
+
+# 複数クエリ（2個）でも同じ関数でOK
+Q = np.array([[1.0, 0.0, 1.0],
+              [0.0, 1.0, 1.0]])
+print(scaled_dot_product_attention(Q, K, V))
+```
+
+`softmax_rows` は「行ごとに合計1にする softmax」です。クエリが複数あるときは、各クエリ（各行）について独立に注目度を出す必要があるため、こうして行方向に正規化します。
+
+:::tip[この章のまとめ]
+
+**前半（概念）**
+
+- Transformer は「全単語ペアの注目度を一気に計算する」アーキテクチャで、いまの LLM の土台。RNN の「遅い・遠い単語を忘れる」を、「順番に読むのをやめる」ことで解決した。
+- 心臓部の **Attention** は、**内積で関連度 → softmax で注目度 → Value の加重和** という、前章の数学そのもの。
+
+**後半（実装）**
+
+- 注目度は $a_i = \dfrac{\exp(q k_i^{\top})}{\sum_j \exp(q k_j^{\top})}$。内積を softmax に通したスカラで、合計1。
+- 出力は Value の加重和 $o = a_1 v_1 + \dots + a_n v_n$。注目した Value が濃く混ざった「新しい表現」。
+- 行列でまとめると $o = \text{softmax}(qK^{\top})V$。NumPy では `softmax(q @ K.T) @ V` の数行で実装でき、手計算と一致する。
+- 実用形は $\sqrt{d_k}$ で割る **スケール化内積アテンション** $\text{softmax}\!\left(\frac{QK^{\top}}{\sqrt{d_k}}\right)V$。
+
+:::
+
+---
+
+この章では、Transformer の心臓部 Attention を、**概念から実装まで一気通貫**でつかみました。ここまでは「単語はすでにベクトルになっている」ことを前提にしてきましたが、その入り口——**テキストをどうやってトークン（数）に変えるか**（トークナイザー）や、モデルの**学習**については、今後の章で扱っていく予定です。

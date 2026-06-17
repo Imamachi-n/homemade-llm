@@ -8,8 +8,12 @@ sidebar_position: 1
 
 ## このサイトで扱うこと
 
-- LLM を構成する基礎技術の解説（[基礎知識](./foundations/chapter1.md)）
-- トークナイザー・Transformer・学習ループの実装（[LLM をゼロから作る](./llm-from-scratch/chapter1.md)）
+[LLM を作って理解する](./llm-textbook/chapter1.md) のセクションで、次の流れを一歩ずつたどります。
+
+- LLM を支える数学の基礎（ベクトル・内積・行列積・softmax）
+- Transformer と、その心臓部であるアテンション機構（概念から NumPy 実装まで）
+
+トークナイザーや学習ループといった章は、今後追加していく予定です。
 
 ## 前提知識
 

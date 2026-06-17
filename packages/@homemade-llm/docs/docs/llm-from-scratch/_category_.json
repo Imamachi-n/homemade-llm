@@ -1,8 +1,0 @@
-{
-  "label": "LLM をゼロから作る",
-  "position": 3,
-  "link": {
-    "type": "generated-index",
-    "description": "トークナイザーからモデルの学習まで、LLM を一から実装するセクションです。"
-  }
-}

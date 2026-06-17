@@ -149,28 +149,15 @@ const config: Config = {
           ],
         },
         {
-          title: '基礎知識',
+          title: 'LLM を作って理解する',
           items: [
             {
-              label: 'Chapter 1: LLM の全体像',
-              to: '/docs/foundations/chapter1',
-            },
-          ],
-        },
-        {
-          title: 'LLM をゼロから作る',
-          items: [
-            {
-              label: 'Chapter 1: トークナイザー',
-              to: '/docs/llm-from-scratch/chapter1',
+              label: 'Chapter 1: LLM のための数学基礎',
+              to: '/docs/llm-textbook/chapter1',
             },
             {
-              label: 'Chapter 2: Transformer の実装',
-              to: '/docs/llm-from-scratch/chapter2',
-            },
-            {
-              label: 'Chapter 3: 学習ループ',
-              to: '/docs/llm-from-scratch/chapter3',
+              label: 'Chapter 2: Transformer',
+              to: '/docs/llm-textbook/chapter2',
             },
           ],
         },

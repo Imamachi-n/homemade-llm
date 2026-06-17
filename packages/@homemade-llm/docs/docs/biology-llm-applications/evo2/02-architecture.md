@@ -20,7 +20,7 @@ title: "02. アーキテクチャと学習・データ"
 
 Evo 2 の最大の特徴は **100 万トークンの文脈長** です。これは「DNA 上で遠く離れた要素（たとえばエンハンサーと遺伝子本体）の関係」を捉えるために不可欠ですが、標準的な Transformer では実現が困難です。理由は、Self-Attention の計算量にあります。
 
-[Transformer の実装](../../llm-from-scratch/chapter2.md)で見たように、Self-Attention は次の式で全トークン間の関連度を計算します。
+[Transformer](../../llm-textbook/chapter2.md)で見たように、Self-Attention は次の式で全トークン間の関連度を計算します。
 
 $$
 \text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{QK^\top}{\sqrt{d}}\right) V
