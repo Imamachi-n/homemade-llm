@@ -975,6 +975,264 @@ print(scaled_dot_product_attention(Q, K, V))
 
 `softmax_rows` は「行ごとに合計1にする softmax」です。クエリが複数あるときは、各クエリ（各行）について独立に注目度を出す必要があるため、こうして行方向に正規化します。
 
+## 8. （発展）マルチヘッドアテンション
+
+前半 3.5 で **Multi-Head Attention（マルチヘッドアテンション／多頭注意）** の名前だけ出てきました。ここまでで Attention 1回ぶん——つまり「**1つの頭（head）**」の計算が、数値でもコードでもできるようになりました。実際の Transformer は、この頭を **複数並べて同時に走らせます**。その仕組みを、これまでと同じ「直感 → 仕組み → 式 → 数値 → コード」の流れで見ていきましょう。
+
+### 8.1 なぜ1つの頭では足りないのか
+
+思い出してほしいのが softmax の性質です。softmax は注目度を「合計1」に配分するので、**1つの頭が強く注目できる相手は、せいぜい1〜数か所**に限られます。言いかえると、**1つの頭は「1種類の関係」をとらえるのが得意**なのです。
+
+ところが、言葉の関係は1種類ではありません。前半 3.1 の例文をもう一度見てみます。
+
+> 「その**動物**は疲れていたので、**それ**は道を渡らなかった」
+
+「それ」という単語を理解するには、本当は複数の観点が同時に必要です。
+
+- **意味のつながり**：「それ」が指すのは「動物」（共参照）。
+- **文法のつながり**：「それ」は「渡らなかった」の主語で、「道」とも関係する。
+
+これを1つの頭の、たった1つの注目配分に押し込めるのは無理があります。そこでマルチヘッドアテンションは、発想を変えます。
+
+> **頭を複数用意し、それぞれに別々の観点を担当させ、最後に全部の見方を合体させる。**
+
+下の図は、同じ文に対して2つの頭が **別々の単語に注目している**様子です。頭1は意味の観点から「動物」に、頭2は文法の観点から「道」に強く注目しています。1つの頭だけでは片方しか拾えなかった関係を、頭を分けることで **同時に**とらえられるのです。
+
+<div style={{display: 'flex', flexWrap: 'wrap', gap: '1.5rem', justifyContent: 'center', alignItems: 'flex-start', margin: '1.25rem 0'}}>
+  <figure style={{margin: 0, textAlign: 'center'}}>
+    <svg viewBox="0 0 230 180" width="220" role="img" aria-label="頭1は意味の観点で動物に強く注目する">
+      <line x1="30" y1="130" x2="210" y2="130" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1" />
+      <rect x="48" y="67" width="34" height="63" fill="#3B82F6" fillOpacity="0.30" stroke="#3B82F6" strokeOpacity="0.65" strokeWidth="1.2" />
+      <rect x="108" y="112" width="34" height="18" fill="#3B82F6" fillOpacity="0.30" stroke="#3B82F6" strokeOpacity="0.65" strokeWidth="1.2" />
+      <rect x="168" y="121" width="34" height="9" fill="#3B82F6" fillOpacity="0.30" stroke="#3B82F6" strokeOpacity="0.65" strokeWidth="1.2" />
+      <text x="65" y="61" fontSize="9" fill="currentColor" textAnchor="middle">0.70</text>
+      <text x="125" y="106" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.8">0.20</text>
+      <text x="185" y="115" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.8">0.10</text>
+      <text x="65" y="145" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.85">動物</text>
+      <text x="125" y="145" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.85">疲れ</text>
+      <text x="185" y="145" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.85">道</text>
+      <text x="120" y="168" fontSize="10" fill="#3B82F6" textAnchor="middle">頭1：意味 →「動物」に注目</text>
+    </svg>
+    <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>① 頭1（意味の観点）：「それ」が指す「動物」に強く注目</figcaption>
+  </figure>
+  <figure style={{margin: 0, textAlign: 'center'}}>
+    <svg viewBox="0 0 230 180" width="220" role="img" aria-label="頭2は文法の観点で道に強く注目する">
+      <line x1="30" y1="130" x2="210" y2="130" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1" />
+      <rect x="48" y="121" width="34" height="9" fill="#10B981" fillOpacity="0.30" stroke="#10B981" strokeOpacity="0.65" strokeWidth="1.2" />
+      <rect x="108" y="108" width="34" height="22" fill="#10B981" fillOpacity="0.30" stroke="#10B981" strokeOpacity="0.65" strokeWidth="1.2" />
+      <rect x="168" y="72" width="34" height="58" fill="#10B981" fillOpacity="0.30" stroke="#10B981" strokeOpacity="0.65" strokeWidth="1.2" />
+      <text x="65" y="115" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.8">0.10</text>
+      <text x="125" y="102" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.8">0.25</text>
+      <text x="185" y="66" fontSize="9" fill="currentColor" textAnchor="middle">0.65</text>
+      <text x="65" y="145" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.85">動物</text>
+      <text x="125" y="145" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.85">疲れ</text>
+      <text x="185" y="145" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.85">道</text>
+      <text x="120" y="168" fontSize="10" fill="#10B981" textAnchor="middle">頭2：文法 →「道」に注目</text>
+    </svg>
+    <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>② 頭2（文法の観点）：述語とつながる「道」に強く注目</figcaption>
+  </figure>
+</div>
+
+:::tip[1つの頭 ＝ これまで学んだ Attention そのもの]
+
+身構える必要はありません。**1つの頭の中身は、7 節までに完成させたスケール化内積アテンションそのまま**です。マルチヘッドは「その計算をいくつも並べて、結果を合体させる」だけ。新しく増えるのは、後述する **連結（Concat）** と **出力射影 $W_O$** の2手順だけです。
+
+:::
+
+### 8.2 仕組み：分ける → 別々に注目 → つなげる → 混ぜる
+
+マルチヘッドアテンションは、次の4ステップでできています。頭の数を $h$ とします。
+
+1. **分ける（射影）**：各頭は専用の重み行列 $W_Q^{(i)}, W_K^{(i)}, W_V^{(i)}$ を持ち、入力を **小さな次元 $d_k$** の Query・Key・Value に変換する。頭ごとに違う変換なので、頭ごとに違う「見方」が生まれる。
+2. **別々に注目（Attention）**：各頭で独立に、7 節のスケール化内積アテンションを計算する。出力は頭ごとに1本のベクトル $\text{head}_i$。
+3. **つなげる（連結 / Concat）**：全頭の出力 $\text{head}_1, \dots, \text{head}_h$ を **横に1本につなげる**。これで次元が元の大きさ（$d_{\text{model}}$）に戻る。
+4. **混ぜる（出力射影）**：連結したベクトルに重み行列 $W_O$ をかけ、**頭をまたいだ情報を混ぜ合わせて**最終出力にする。
+
+<figure style={{margin: '1.25rem auto', textAlign: 'center', maxWidth: '480px'}}>
+  <svg viewBox="0 0 470 200" width="460" role="img" aria-label="マルチヘッドアテンションの流れ：入力を各頭へ分けて別々に注目し、連結して W_O で混ぜる">
+    <defs>
+      <marker id="mhArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="currentColor" fillOpacity="0.55" />
+      </marker>
+    </defs>
+    <rect x="12" y="80" width="46" height="26" rx="4" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeOpacity="0.55" strokeWidth="1.2" />
+    <text x="35" y="97" fontSize="10" fill="currentColor" textAnchor="middle">入力 x</text>
+    <line x1="58" y1="88" x2="90" y2="38" stroke="currentColor" strokeOpacity="0.45" strokeWidth="1.2" markerEnd="url(#mhArrow)" />
+    <line x1="58" y1="93" x2="90" y2="93" stroke="currentColor" strokeOpacity="0.45" strokeWidth="1.2" markerEnd="url(#mhArrow)" />
+    <line x1="58" y1="98" x2="90" y2="148" stroke="currentColor" strokeOpacity="0.45" strokeWidth="1.2" markerEnd="url(#mhArrow)" />
+    <text x="62" y="74" fontSize="8" fill="currentColor" textAnchor="start" fillOpacity="0.6">射影で分ける</text>
+    <rect x="92" y="22" width="96" height="26" rx="4" fill="#3B82F6" fillOpacity="0.16" stroke="#3B82F6" strokeOpacity="0.6" strokeWidth="1.2" />
+    <text x="140" y="39" fontSize="9" fill="currentColor" textAnchor="middle">頭1：Attention</text>
+    <rect x="92" y="80" width="96" height="26" rx="4" fill="#10B981" fillOpacity="0.16" stroke="#10B981" strokeOpacity="0.6" strokeWidth="1.2" />
+    <text x="140" y="97" fontSize="9" fill="currentColor" textAnchor="middle">頭2：Attention</text>
+    <rect x="92" y="138" width="96" height="26" rx="4" fill="#EF4444" fillOpacity="0.16" stroke="#EF4444" strokeOpacity="0.6" strokeWidth="1.2" />
+    <text x="140" y="155" fontSize="9" fill="currentColor" textAnchor="middle">頭3：…</text>
+    <line x1="188" y1="35" x2="230" y2="86" stroke="currentColor" strokeOpacity="0.45" strokeWidth="1.2" markerEnd="url(#mhArrow)" />
+    <line x1="188" y1="93" x2="230" y2="93" stroke="currentColor" strokeOpacity="0.45" strokeWidth="1.2" markerEnd="url(#mhArrow)" />
+    <line x1="188" y1="151" x2="230" y2="100" stroke="currentColor" strokeOpacity="0.45" strokeWidth="1.2" markerEnd="url(#mhArrow)" />
+    <rect x="232" y="80" width="56" height="26" rx="4" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeOpacity="0.55" strokeWidth="1.2" />
+    <text x="260" y="97" fontSize="10" fill="currentColor" textAnchor="middle">連結</text>
+    <line x1="288" y1="93" x2="320" y2="93" stroke="currentColor" strokeOpacity="0.45" strokeWidth="1.2" markerEnd="url(#mhArrow)" />
+    <rect x="322" y="80" width="44" height="26" rx="4" fill="currentColor" fillOpacity="0.12" stroke="currentColor" strokeOpacity="0.6" strokeWidth="1.3" />
+    <text x="344" y="97" fontSize="11" fill="currentColor" textAnchor="middle" fontStyle="italic">W_O</text>
+    <line x1="366" y1="93" x2="398" y2="93" stroke="currentColor" strokeOpacity="0.45" strokeWidth="1.2" markerEnd="url(#mhArrow)" />
+    <rect x="400" y="80" width="52" height="26" rx="4" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeOpacity="0.55" strokeWidth="1.2" />
+    <text x="426" y="97" fontSize="10" fill="currentColor" textAnchor="middle">出力</text>
+    <text x="260" y="125" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.6">つなげて元の次元へ</text>
+    <text x="344" y="125" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.6">頭を混ぜる</text>
+    <text x="235" y="185" fontSize="10" fill="currentColor" textAnchor="middle" fillOpacity="0.8">各頭は別々の観点で並列に注目し、最後に連結＋W_O で1つに統合する</text>
+  </svg>
+  <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>マルチヘッドアテンションの流れ：分ける → 頭ごとに注目 → 連結 → $W_O$ で混ぜる</figcaption>
+</figure>
+
+### 8.3 式で書く
+
+4ステップを式にすると、こうなります。
+
+$$
+\text{MultiHead}(Q, K, V) = \text{Concat}(\text{head}_1,\ \dots,\ \text{head}_h)\, W_O
+$$
+
+そして、各頭 $\text{head}_i$ の中身は、7 節のスケール化内積アテンションそのものです。
+
+$$
+\text{head}_i = \text{Attention}(Q W_Q^{(i)},\ K W_K^{(i)},\ V W_V^{(i)})
+$$
+
+| 記号 | 中身 |
+| --- | --- |
+| $h$ | 頭の数（たとえば 8） |
+| $d_{\text{model}}$ | 入力・出力ベクトルの次元（たとえば 512） |
+| $W_Q^{(i)}, W_K^{(i)}, W_V^{(i)}$ | 頭 $i$ 専用の射影行列。入力を次元 $d_k$ の小さな空間へ変換する |
+| $d_k$ | 各頭の Query・Key（と Value）の次元。ふつう $d_k = d_{\text{model}} / h$ |
+| $\text{head}_i$ | 頭 $i$ の Attention 出力（次元 $d_k$） |
+| $W_O$ | 連結結果を混ぜて元の次元 $d_{\text{model}}$ に戻す出力射影行列 |
+
+ここで効いているのが $d_k = d_{\text{model}} / h$ という割り当てです。たとえば $d_{\text{model}} = 512$、$h = 8$ なら、各頭は $d_k = 64$ 次元という **小さな空間**で計算します。
+
+:::note[頭を増やしても計算量はほぼ変わらない（うれしい設計）]
+
+「頭を8個も並べたら8倍重いのでは？」と思うかもしれませんが、そうはなりません。各頭の次元を $d_k = d_{\text{model}} / h$ と **小さく**しているからです。
+
+- 1つの大きな頭（次元 $d_{\text{model}}$）で計算する場合と、
+- $h$ 個の小さな頭（各 $d_k = d_{\text{model}}/h$）に分けて計算する場合
+
+で、足し合わせた計算量はだいたい同じになります。つまりマルチヘッドは、**同じコストのまま「1つの広い視野」を「複数の専門的な視野」に分け直している**わけです。コストを増やさずに表現力だけ上げられる、よくできた設計です。
+
+:::
+
+:::tip[なぜ最後に $W_O$ が必要なの？]
+
+連結しただけの状態は、各頭の出力をただ横に並べただけで、**頭どうしの情報がまだ混ざっていません**。「頭1は動物に、頭2は道に注目した」という別々の結果が、隣り合って置いてあるだけです。
+
+そこで $W_O$ をかけることで、頭をまたいで情報を混ぜ合わせ、「複数の観点を統合した1つの表現」に仕上げます。$W_O$ も学習で決まるので、**どの頭の情報をどう組み合わせると役に立つか**を、モデル自身が獲得していきます。
+
+:::
+
+### 8.4 数値で見る：2つの頭をつないでみる
+
+小さな例で、ステップ②〜④（注目 → 連結 → 混ぜる）を追ってみましょう。頭は2つ（$h=2$）、各頭の Value は2次元（$d_k=2$）とします。8.1 の図のとおり、2つの頭は別々の単語に注目しているとします。
+
+**頭1**（意味の頭）は「動物」に強く注目し、注目度 $a^{(1)} = (0.7,\ 0.2,\ 0.1)$。3つの Value を $v^{(1)}_1=(1,0),\ v^{(1)}_2=(0,1),\ v^{(1)}_3=(1,1)$ とすると、
+
+$$
+\text{head}_1 = 0.7\,(1,0) + 0.2\,(0,1) + 0.1\,(1,1) = (0.8,\ 0.3)
+$$
+
+**頭2**（文法の頭）は「道」に強く注目し、注目度 $a^{(2)} = (0.1,\ 0.2,\ 0.7)$。Value は別の射影なので $v^{(2)}_1=(0,1),\ v^{(2)}_2=(1,0),\ v^{(2)}_3=(1,1)$ だとすると、
+
+$$
+\text{head}_2 = 0.1\,(0,1) + 0.2\,(1,0) + 0.7\,(1,1) = (0.9,\ 0.8)
+$$
+
+**ステップ③ 連結（Concat）**：2つの頭の出力を、横に1本につなげます。
+
+$$
+\text{Concat}(\text{head}_1, \text{head}_2) = (\underbrace{0.8,\ 0.3}_{\text{頭1}},\ \underbrace{0.9,\ 0.8}_{\text{頭2}}) = (0.8,\ 0.3,\ 0.9,\ 0.8)
+$$
+
+2次元 × 2頭 ＝ 4次元になり、これが $d_{\text{model}} = 4$ にあたります。**意味の観点（頭1）と文法の観点（頭2）が、1本のベクトルの中に共存している**のがポイントです。
+
+<figure style={{margin: '1.25rem auto', textAlign: 'center', maxWidth: '460px'}}>
+  <svg viewBox="0 0 440 150" width="430" role="img" aria-label="2つの頭の出力を連結し、W_O で混ぜて最終出力にする">
+    <defs>
+      <marker id="catArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="currentColor" fillOpacity="0.55" />
+      </marker>
+    </defs>
+    <text x="50" y="30" fontSize="10" fill="#3B82F6" textAnchor="middle">頭1</text>
+    <rect x="20" y="38" width="30" height="22" fill="#3B82F6" fillOpacity="0.22" stroke="#3B82F6" strokeOpacity="0.6" strokeWidth="1.1" />
+    <rect x="50" y="38" width="30" height="22" fill="#3B82F6" fillOpacity="0.22" stroke="#3B82F6" strokeOpacity="0.6" strokeWidth="1.1" />
+    <text x="35" y="53" fontSize="9" fill="currentColor" textAnchor="middle">0.8</text>
+    <text x="65" y="53" fontSize="9" fill="currentColor" textAnchor="middle">0.3</text>
+    <text x="110" y="30" fontSize="10" fill="#10B981" textAnchor="middle">頭2</text>
+    <rect x="80" y="38" width="30" height="22" fill="#10B981" fillOpacity="0.22" stroke="#10B981" strokeOpacity="0.6" strokeWidth="1.1" />
+    <rect x="110" y="38" width="30" height="22" fill="#10B981" fillOpacity="0.22" stroke="#10B981" strokeOpacity="0.6" strokeWidth="1.1" />
+    <text x="95" y="53" fontSize="9" fill="currentColor" textAnchor="middle">0.9</text>
+    <text x="125" y="53" fontSize="9" fill="currentColor" textAnchor="middle">0.8</text>
+    <text x="80" y="78" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.75">連結（4次元 ＝ d_model）</text>
+    <line x1="150" y1="49" x2="195" y2="49" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1.4" markerEnd="url(#catArrow)" />
+    <rect x="200" y="38" width="44" height="22" rx="3" fill="currentColor" fillOpacity="0.12" stroke="currentColor" strokeOpacity="0.6" strokeWidth="1.3" />
+    <text x="222" y="53" fontSize="11" fill="currentColor" textAnchor="middle" fontStyle="italic">W_O</text>
+    <text x="222" y="78" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.75">頭をまたいで混ぜる</text>
+    <line x1="244" y1="49" x2="289" y2="49" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1.4" markerEnd="url(#catArrow)" />
+    <rect x="294" y="36" width="90" height="26" rx="4" fill="#EF4444" fillOpacity="0.14" stroke="#EF4444" strokeOpacity="0.6" strokeWidth="1.3" />
+    <text x="339" y="53" fontSize="10" fill="currentColor" textAnchor="middle">最終出力</text>
+    <text x="339" y="80" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.75">d_model 次元</text>
+    <text x="200" y="120" fontSize="10" fill="currentColor" textAnchor="middle" fillOpacity="0.8">2つの観点を1本にまとめ、W_O で混ぜて次の層へ渡せる形にする</text>
+  </svg>
+  <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>連結で各頭の出力を1本にし、$W_O$ で混ぜて最終出力（$d_{\text{model}}$ 次元）にする</figcaption>
+</figure>
+
+**ステップ④ 出力射影**：最後に連結ベクトルに $W_O$ をかけ、頭をまたいで情報を混ぜます。$W_O$ は学習で決まる行列なので、ここでは具体的な数値計算は次のコードに譲りますが、**やっていることは「4次元ベクトルに行列をかけて4次元ベクトルにする」だけ**——前章で学んだ線形変換そのものです。
+
+### 8.5 NumPy で実装する
+
+7.4 で作った `scaled_dot_product_attention` を、そのまま部品として使い回せます。各頭でそれを呼び、出力を連結し、最後に $W_O$ をかけるだけです。
+
+```python
+# 入力：3トークン、各 d_model = 4 次元
+X = np.array([
+    [1.0, 0.0, 1.0, 0.0],
+    [0.0, 1.0, 0.0, 1.0],
+    [1.0, 1.0, 0.0, 0.0],
+])
+
+d_model, h = 4, 2
+d_k = d_model // h          # 各ヘッドの次元 = 2
+
+# 各ヘッド専用の射影行列。本来は学習で決まるが、ここでは例として固定の乱数を使う
+rng = np.random.default_rng(0)
+W_Q = rng.normal(size=(h, d_model, d_k))   # 頭ごとの Query 用
+W_K = rng.normal(size=(h, d_model, d_k))   # 頭ごとの Key 用
+W_V = rng.normal(size=(h, d_model, d_k))   # 頭ごとの Value 用
+W_O = rng.normal(size=(h * d_k, d_model))  # 連結結果を混ぜる出力射影
+
+# ① 各頭で別々に Attention を計算（中身は 7.4 の関数そのまま）
+heads = []
+for i in range(h):
+    Q = X @ W_Q[i]          # (3, d_k) … 頭 i 用に射影
+    K = X @ W_K[i]
+    V = X @ W_V[i]
+    heads.append(scaled_dot_product_attention(Q, K, V))   # (3, d_k)
+
+# ② 連結 → ③ W_O で混ぜる
+concat = np.concatenate(heads, axis=-1)   # (3, h*d_k) = (3, 4)
+output = concat @ W_O                       # (3, d_model) = (3, 4)
+
+print(output.shape)        # (3, 4)
+```
+
+ポイントは2つです。1つめは、**各頭の中身は 7.4 の `scaled_dot_product_attention` をそのまま呼んでいるだけ**だということ。マルチヘッドで新しく増えたのは、頭ごとの射影（`X @ W_Q[i]` など）と、連結（`np.concatenate`）、出力射影（`@ W_O`）の3点だけです。
+
+2つめは、**出力の形が入力と同じ `(3, 4)`** になっていること。入力 $d_{\text{model}}$ 次元 → 出力 $d_{\text{model}}$ 次元、と形が保たれるので、この出力をそのまま次の層の入力にできます。**この「同じ形のブロックを積み重ねる」のが Transformer の本体**で、いまの LLM はこのブロックを何十段も重ねてできています。
+
+:::tip[前半 3.5 とのつながり]
+
+3.5 で「複数の頭が別々の観点で注目し、最後に統合する」と一言で説明したものが、ここで式とコードになりました。実際の Transformer では、Query・Key・Value をすべて同じ文章から作る **Self-Attention**（3.5）を、この **マルチヘッド**にした「**Multi-Head Self-Attention**」が基本ブロックとして使われています。
+
+:::
+
 :::tip[この章のまとめ]
 
 **前半（概念）**
@@ -988,6 +1246,11 @@ print(scaled_dot_product_attention(Q, K, V))
 - 出力は Value の加重和 $o = a_1 v_1 + \dots + a_n v_n$。注目した Value が濃く混ざった「新しい表現」。
 - 行列でまとめると $o = \text{softmax}(qK^{\top})V$。NumPy では `softmax(q @ K.T) @ V` の数行で実装でき、手計算と一致する。
 - 実用形は $\sqrt{d_k}$ で割る **スケール化内積アテンション** $\text{softmax}\!\left(\frac{QK^{\top}}{\sqrt{d_k}}\right)V$。
+
+**発展（マルチヘッドアテンション）**
+
+- 1つの頭は「1種類の関係」しか拾えないので、頭を $h$ 個並べて別々の観点を担当させる。各頭は次元 $d_k = d_{\text{model}}/h$ の小さな空間で、7 節の Attention をそのまま計算する。
+- $\text{MultiHead}(Q,K,V) = \text{Concat}(\text{head}_1,\dots,\text{head}_h)\,W_O$。連結で1本にまとめ、$W_O$ で頭をまたいで混ぜる。出力は入力と同じ $d_{\text{model}}$ 次元なので、ブロックとして積み重ねられる。
 
 :::
 
