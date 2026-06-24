@@ -624,15 +624,337 @@ print(np.allclose(o_loop, a @ V))   # True
 
 ## 7. （発展）スケール化内積アテンション
 
-最後に、前半 3.4 で出てきた **$\sqrt{d_k}$ で割るスケーリング**を実装に足します。スコアをキーの次元数 $d_k$ の平方根で割るだけです。
+最後に、前半 3.4 で出てきた **$\sqrt{d_k}$ で割るスケーリング**を、ちゃんと理由づけしてから実装に足します。やること自体は「スコアをキーの次元数 $d_k$ の平方根で割るだけ」です。
 
 $$
 o = \text{softmax}\!\left(\frac{q K^{\top}}{\sqrt{d_k}}\right) V
 $$
 
-これが **スケール化内積アテンション（Scaled Dot-Product Attention）** で、実用上はこちらが標準形です（$d_k$ が大きいときに softmax が極端に偏るのを防ぐ、というのが理由でした）。
+これが **スケール化内積アテンション（Scaled Dot-Product Attention）** で、実用上はこちらが標準形です。$d_k$ はキー（とクエリ）ベクトルの次元数で、たとえば $d_k = 64$ や $512$ のような値です。
 
-実装は 6 節にわり算を1つ足すだけです。Query が複数（行列 $Q$）になっても、同じ式がそのまま動きます。
+なぜわざわざ割り算を1つ足すのか——順番に見ていきましょう。
+
+### 7.1 なぜ割るのか：softmax の「偏りすぎ」を防ぐ
+
+思い出してほしいのが softmax の性質です。softmax は入力の**差**を指数関数で強調します。入力の値が全体的に大きくなると、いちばん大きい成分だけが極端に勝ち、出力がほぼ「1, 0, 0, …」に張り付いてしまいます。
+
+これが起きると困ることが2つあります。
+
+- **注目がガチガチに偏る**：本当は「動物に強め、疲れに少し」と配分したいのに、「動物にほぼ全部」になってしまい、他の単語の情報を拾えない。
+- **学習が進まなくなる**：出力が 1 や 0 に張り付いた softmax は、入力が少し変わっても出力がほとんど動きません。これは「**勾配がほぼ 0**（傾きが消える）」状態で、モデルが「どっちに修正すればいいか」を受け取れず、学習が止まってしまいます。
+
+下の図の左（①）は、スコア（注目元と注目先の相性）を横軸に、softmax が返す注目度を縦軸にとったものです。**中央のスコアがほどよい範囲**ではカーブに傾きがあり、スコアが少し動けば注目度もちゃんと動きます（＝「どっちに修正すべきか」が伝わる＝学習できる）。ところが**スコアが大きい右側**はカーブが平らに寝てしまい、スコアが動いても注目度はほぼ 1 のまま変わりません。この「平らな領域」が、注目が偏りきって**勾配がほぼ 0 になる飽和ゾーン**です。
+
+右（②）は、この2つの動作点が実際に生む**注目度の配分（棒グラフ）**です。飽和側（赤）は1か所に全振りして他をいっさい拾えず、ほどよい側（青）は強弱をつけつつ他の単語の情報も残しています。
+
+<div style={{display: 'flex', flexWrap: 'wrap', gap: '1.5rem', justifyContent: 'center', alignItems: 'flex-start', margin: '1.25rem 0'}}>
+  <figure style={{margin: 0, textAlign: 'center'}}>
+  <svg viewBox="0 0 380 235" width="350" role="img" aria-label="注目度のカーブ：スコアが大きいほどカーブが平らになり勾配が消える">
+    <line x1="50" y1="30" x2="50" y2="172" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1" />
+    <line x1="50" y1="172" x2="345" y2="172" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1" markerEnd="url(#axR)" />
+    <defs>
+      <marker id="axR" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="currentColor" fillOpacity="0.5" />
+      </marker>
+      <marker id="pullA" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="#3B82F6" />
+      </marker>
+    </defs>
+    <line x1="46" y1="100" x2="50" y2="100" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1" />
+    <line x1="46" y1="30" x2="50" y2="30" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1" />
+    <text x="43" y="174" fontSize="8" fill="currentColor" textAnchor="end" fillOpacity="0.7">0</text>
+    <text x="43" y="103" fontSize="8" fill="currentColor" textAnchor="end" fillOpacity="0.7">0.5</text>
+    <text x="43" y="33" fontSize="8" fill="currentColor" textAnchor="end" fillOpacity="0.7">1</text>
+    <polyline points="50,169.6 73,169.1 97,167.5 120,163.4 143,153.3 167,132.3 190,100 213,67.7 237,46.7 260,36.6 283,32.5 307,31 330,30.4" fill="none" stroke="currentColor" strokeWidth="2" strokeOpacity="0.85" />
+    <line x1="283" y1="32.5" x2="213" y2="67.7" stroke="#3B82F6" strokeOpacity="0.6" strokeWidth="1.6" strokeDasharray="4 3" markerEnd="url(#pullA)" />
+    <circle cx="283" cy="32.5" r="5" fill="#EF4444" fillOpacity="0.85" stroke="#EF4444" strokeWidth="1" />
+    <circle cx="213" cy="67.7" r="5" fill="#3B82F6" fillOpacity="0.85" stroke="#3B82F6" strokeWidth="1" />
+    <text x="300" y="30" fontSize="9" fill="#EF4444" textAnchor="start">スコア大：平ら</text>
+    <text x="300" y="42" fontSize="8" fill="#EF4444" textAnchor="start" fillOpacity="0.85">勾配ほぼ0</text>
+    <text x="150" y="62" fontSize="9" fill="#3B82F6" textAnchor="end">ほどよい：傾きあり</text>
+    <text x="150" y="74" fontSize="8" fill="#3B82F6" textAnchor="end" fillOpacity="0.85">学習できる</text>
+    <text x="240" y="58" fontSize="8.5" fill="#3B82F6" textAnchor="middle">÷√dₖ で引き戻す</text>
+    <text x="200" y="192" fontSize="10" fill="currentColor" textAnchor="middle" fillOpacity="0.8">スコア（Q と K の相性）大きい →</text>
+    <text x="20" y="100" fontSize="10" fill="currentColor" textAnchor="middle" fillOpacity="0.8" transform="rotate(-90 20 100)">注目度</text>
+  </svg>
+  <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>① 注目度のカーブ：スコアが大きいほど平らに飽和し、傾き（勾配）が消える。$\sqrt{d_k}$ で割るのは、動作点を平らな右側から傾きのある中央へ引き戻す操作にあたる</figcaption>
+  </figure>
+  <figure style={{margin: 0, textAlign: 'center'}}>
+    <svg viewBox="0 0 250 175" width="240" role="img" aria-label="注目度の配分：飽和すると1か所に偏り、ほどよいと強弱をつけつつ他も残る">
+      <line x1="15" y1="125" x2="235" y2="125" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1" />
+      <text x="66" y="18" fontSize="9" fill="#EF4444" textAnchor="middle">スコア大（飽和）</text>
+      <rect x="35" y="45" width="18" height="80" fill="#EF4444" fillOpacity="0.30" stroke="#EF4444" strokeOpacity="0.65" strokeWidth="1.1" />
+      <rect x="58" y="122" width="18" height="3" fill="#EF4444" fillOpacity="0.30" stroke="#EF4444" strokeOpacity="0.65" strokeWidth="1.1" />
+      <rect x="81" y="122" width="18" height="3" fill="#EF4444" fillOpacity="0.30" stroke="#EF4444" strokeOpacity="0.65" strokeWidth="1.1" />
+      <text x="44" y="138" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.8">a₁</text>
+      <text x="67" y="138" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.8">a₂</text>
+      <text x="90" y="138" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.8">a₃</text>
+      <text x="66" y="160" fontSize="9" fill="#EF4444" textAnchor="middle">1か所に全振り</text>
+      <line x1="118" y1="35" x2="118" y2="125" stroke="currentColor" strokeOpacity="0.2" strokeWidth="1" strokeDasharray="3 3" />
+      <text x="171" y="18" fontSize="9" fill="#3B82F6" textAnchor="middle">ほどよい</text>
+      <rect x="140" y="72" width="18" height="53" fill="#3B82F6" fillOpacity="0.30" stroke="#3B82F6" strokeOpacity="0.65" strokeWidth="1.1" />
+      <rect x="163" y="117" width="18" height="8" fill="#3B82F6" fillOpacity="0.30" stroke="#3B82F6" strokeOpacity="0.65" strokeWidth="1.1" />
+      <rect x="186" y="105" width="18" height="20" fill="#3B82F6" fillOpacity="0.30" stroke="#3B82F6" strokeOpacity="0.65" strokeWidth="1.1" />
+      <text x="149" y="138" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.8">a₁</text>
+      <text x="172" y="138" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.8">a₂</text>
+      <text x="195" y="138" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.8">a₃</text>
+      <text x="171" y="160" fontSize="9" fill="#3B82F6" textAnchor="middle">強弱つき・他も残る</text>
+    </svg>
+    <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>② 実際の注目度の配分：飽和（赤）は1か所に全振りして他を拾えない。ほどよい（青）は強弱をつけつつ他の情報も残る（具体的な数値は 7.3 で確認）</figcaption>
+  </figure>
+</div>
+
+つまりスコアが大きくなりすぎると softmax が飽和して使いものにならない。だから **スコアの大きさをほどよく抑えたい**——これがスケーリングの目的です。後の 7.2 で見るように、その「ほどよい大きさ」に引き戻す割り算がちょうど $\sqrt{d_k}$ になります。
+
+### 7.2 なぜ「平方根」なのか：スコアの“ばらつき”をそろえる
+
+ここがいちばんの肝です。「大きさを抑えたい」だけなら適当な定数で割ってもよさそうなのに、なぜちょうど $\sqrt{d_k}$ なのでしょうか。理由は、**スコアのばらつき（標準偏差）がちょうど $\sqrt{d_k}$ に比例して大きくなる**からです。
+
+ざっくり次のように考えます。クエリ $q$ とキー $k$ の各成分が、平均 $0$・ばらつき（分散）$1$ くらいでバラバラな値だとします。スコアは内積なので、$d_k$ 個の項の足し算です。
+
+$$
+q\,k^{\top} = q_1 k_1 + q_2 k_2 + \dots + q_{d_k} k_{d_k}
+$$
+
+内積の計算じたいは、**対応する成分どうしを掛けて、全部足すだけ**です。$1$ より大きい値が混じっても手順は変わりません。たとえば $3$ 次元（$d_k=3$）で
+
+$$
+q = (2,\ 1,\ 3), \qquad k = (1,\ 2,\ 2)
+$$
+
+なら、
+
+$$
+q\,k^{\top} = 2\cdot 1 + 1\cdot 2 + 3\cdot 2 = 2 + 2 + 6 = 10
+$$
+
+のように、位置ごとの積 $2{\cdot}1,\ 1{\cdot}2,\ 3{\cdot}2$ を足し合わせた **1つの数（スコア）** になります。
+
+さて、ここからは「**次元 $d_k$ が大きいほどスコアが大きくなる**」様子を見やすくするため、各成分を $+1$ か $-1$ に単純化します（平均をちょうど $0$、分散をちょうど $1$ にそろえ、上の仮定にぴったり合わせるためです）。すると内積の各項 $q_i k_i$ も $+1$ か $-1$ のどちらかになり、**スコアは「$\pm 1$ を $d_k$ 個足し合わせたもの」**になります。
+
+まず $d_k = 4$ で計算してみます。
+
+| 位置 $i$ | 1 | 2 | 3 | 4 |
+| --- | --- | --- | --- | --- |
+| クエリ $q_i$ | $+1$ | $+1$ | $-1$ | $+1$ |
+| キー $k_i$ | $+1$ | $-1$ | $-1$ | $+1$ |
+| 積 $q_i k_i$ | $+1$ | $-1$ | $+1$ | $+1$ |
+
+スコアは各項の合計なので、
+
+$$
+q\,k^{\top} = (+1) + (-1) + (+1) + (+1) = 2
+$$
+
+目安どおり $\sqrt{4}=2$ くらいの大きさになりました。次に次元を $d_k = 16$ に増やすと、今度は $\pm 1$ を **16 個**足すことになります。たとえば $+1$ が 10 個・$-1$ が 6 個そろえば、スコア $= 10 - 6 = 4$。やはり目安の $\sqrt{16}=4$ くらいです。
+
+**次元が $4 \to 16$ と 4 倍になると、スコアの大きさの目安は $2 \to 4$ と 2 倍（＝$\sqrt{4}$ 倍）に増えました。** 次元が増えるほど足し合わさる項が増えて、スコアが大きく振れるわけです。
+
+この背景にあるのが「**独立な数をたくさん足すと、ばらつきは足した個数だけ大きくなる**」という統計の性質です。各項のばらつきが $1$ なら、$d_k$ 個足したスコアの分散は $d_k$、その平方根である **標準偏差（ばらつきの目安）は $\sqrt{d_k}$** になります。
+
+:::note[コラム：分散と標準偏差ってなに？]
+
+どちらも「**データが平均のまわりにどれくらい散らばっているか**」を表す数です。同じ平均でも、ぎゅっと固まっているか、広く散っているかを1つの数で言い表したいときに使います。
+
+たとえば 3 人のテストの点を考えます。平均はどれも 50 点ですが、散らばり方が違います。
+
+- $\{50,\ 50,\ 50\}$ … 全員ぴったり同じ。散らばり **ゼロ**。
+- $\{40,\ 50,\ 60\}$ … 少し散らばっている。
+- $\{0,\ 50,\ 100\}$ … 大きく散らばっている。
+
+これを数値にする手順はこうです。
+
+1. 各データの「平均からのズレ」を求める。
+2. ズレを **2乗** して、その平均をとる。これが **分散**。
+3. 分散の **平方根**（ルート）をとる。これが **標準偏差**。
+
+$\{0,50,100\}$ なら、ズレは $-50,\ 0,\ +50$。2乗して平均すると分散は $\frac{2500+0+2500}{3} \approx 1667$、その平方根の標準偏差は $\sqrt{1667} \approx 41$ です。「だいたい平均 ±41 点くらいに散らばっている」と読めます。
+
+3つを数直線に並べると、ひと目で違いが分かります。**平均（緑の線）はどれも 50 で同じ**なのに、散らばりを表す**青い帯の幅（＝標準偏差）**が大きく変わります。
+
+<figure style={{margin: '1.25rem auto', textAlign: 'center', maxWidth: '460px'}}>
+  <svg viewBox="0 0 440 235" width="430" role="img" aria-label="平均は同じ50でも、データの散らばり（標準偏差）が異なる3つの例を数直線で比較">
+    <line x1="220" y1="40" x2="220" y2="206" stroke="#10B981" strokeWidth="1.4" strokeDasharray="4 3" strokeOpacity="0.9" />
+    <text x="220" y="32" fontSize="10" fill="#10B981" textAnchor="middle">平均 50</text>
+    <text x="70" y="56" fontSize="9" fill="currentColor" textAnchor="start" fillOpacity="0.85">{'{50, 50, 50}'}</text>
+    <line x1="70" y1="70" x2="370" y2="70" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1" />
+    <circle cx="220" cy="70" r="4.5" fill="currentColor" fillOpacity="0.85" />
+    <text x="232" y="65" fontSize="8" fill="currentColor" textAnchor="start" fillOpacity="0.6">×3（重なり）</text>
+    <text x="380" y="73" fontSize="9" fill="#3B82F6" textAnchor="start">σ = 0</text>
+    <text x="70" y="116" fontSize="9" fill="currentColor" textAnchor="start" fillOpacity="0.85">{'{40, 50, 60}'}</text>
+    <rect x="195.5" y="120" width="49" height="20" rx="2" fill="#3B82F6" fillOpacity="0.18" stroke="#3B82F6" strokeOpacity="0.5" strokeWidth="1" />
+    <line x1="70" y1="130" x2="370" y2="130" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1" />
+    <circle cx="190" cy="130" r="4.5" fill="currentColor" fillOpacity="0.85" />
+    <circle cx="220" cy="130" r="4.5" fill="currentColor" fillOpacity="0.85" />
+    <circle cx="250" cy="130" r="4.5" fill="currentColor" fillOpacity="0.85" />
+    <text x="380" y="133" fontSize="9" fill="#3B82F6" textAnchor="start">σ ≈ 8.2</text>
+    <text x="70" y="176" fontSize="9" fill="currentColor" textAnchor="start" fillOpacity="0.85">{'{0, 50, 100}'}</text>
+    <rect x="97.5" y="180" width="245" height="20" rx="2" fill="#3B82F6" fillOpacity="0.18" stroke="#3B82F6" strokeOpacity="0.5" strokeWidth="1" />
+    <line x1="70" y1="190" x2="370" y2="190" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1" />
+    <circle cx="70" cy="190" r="4.5" fill="currentColor" fillOpacity="0.85" />
+    <circle cx="220" cy="190" r="4.5" fill="currentColor" fillOpacity="0.85" />
+    <circle cx="370" cy="190" r="4.5" fill="currentColor" fillOpacity="0.85" />
+    <text x="380" y="193" fontSize="9" fill="#3B82F6" textAnchor="start">σ ≈ 41</text>
+    <text x="70" y="220" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.6">0</text>
+    <text x="220" y="220" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.6">50</text>
+    <text x="370" y="220" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.6">100</text>
+  </svg>
+  <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>平均（緑）はどれも 50 で同じでも、散らばりを表す青い帯の幅＝標準偏差 $\sigma$ は大きく違う。分散はこの幅をさらに2乗した量にあたる</figcaption>
+</figure>
+
+$$
+\text{分散} = \overline{(\text{ズレ})^2}, \qquad \text{標準偏差} = \sqrt{\text{分散}}
+$$
+
+では、2つは結局それぞれ何を表しているのでしょうか。同じ「散らばり具合」を表す仲間ですが、役割を分けるとこうです。
+
+- **分散** … 散らばりの大きさそのもの。ただしズレを **2乗** しているので、単位（スケール）が元と変わってしまう（点なら「点²」）。足し算と相性がよく、**数式や理論で扱いやすい**のが長所。
+- **標準偏差** … その分散を **平方根で元のスケールに戻した** もの。「だいたい平均 ±これくらい散らばる」と、**人間が実感しやすい目安**になる。
+
+ひとことで言えば、**分散は計算向き・標準偏差は読み取り向き**——同じ散らばりを別の単位で見ているだけ、と思えば十分です。なぜわざわざ分散を経由するかというと、次に出てくる「足すと散らばりがたまる」という性質が、標準偏差ではなく**分散でこそきれいに成り立つ**からです。
+
+このコラムで覚えてほしいのは1点だけ。**独立なデータを足し合わせると、分散はそのまま足し算でたまっていく**（これを分散の加法性といいます）。だから「$1$ の項を $d_k$ 個足すと分散は $d_k$、標準偏差はその平方根の $\sqrt{d_k}$」という、本文の話につながるのです。
+
+:::
+
+| 次元 $d_k$ | スコアの典型的な大きさ（標準偏差 $\sqrt{d_k}$） |
+| --- | --- |
+| $4$ | $2$ |
+| $64$ | $8$ |
+| $512$ | $\approx 22.6$ |
+
+つまり**次元が大きいモデルほど、何もしなければスコアが自動的に大きくなり**、softmax が飽和しやすくなります。そこでスコアを $\sqrt{d_k}$ で割ると、ばらつきが $1$ 前後に戻り、**$d_k$ がいくつでもスコアの大きさが一定**に保たれます。これがちょうど「平方根」を使う理由です。
+
+:::note[コラム：なぜ「割る」とばらつきが 1 に戻るの？]
+
+カギは、**データ全体を同じ数で割ると、散らばりの幅（標準偏差）も同じ数だけ縮む**という性質です。数直線に散らばった点を、まるごと $\frac{1}{8}$ に縮小コピーすると、点の間隔（＝散らばりの幅）も $\frac{1}{8}$ になる——それと同じイメージです。
+
+<figure style={{margin: '1.25rem auto', textAlign: 'center', maxWidth: '460px'}}>
+  <svg viewBox="0 0 440 215" width="430" role="img" aria-label="スコアを √dk で割ると、散らばりの幅が √dk から 1 に縮む様子">
+    <line x1="220" y1="38" x2="220" y2="188" stroke="#10B981" strokeWidth="1.3" strokeDasharray="4 3" strokeOpacity="0.85" />
+    <text x="220" y="30" fontSize="9" fill="#10B981" textAnchor="middle">平均（中心）</text>
+    <text x="70" y="52" fontSize="9" fill="currentColor" textAnchor="start" fillOpacity="0.85">割る前（dₖ = 64）</text>
+    <rect x="92" y="58" width="256" height="20" rx="2" fill="#3B82F6" fillOpacity="0.18" stroke="#3B82F6" strokeOpacity="0.5" strokeWidth="1" />
+    <line x1="70" y1="68" x2="370" y2="68" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1" />
+    <circle cx="92" cy="68" r="3.5" fill="currentColor" fillOpacity="0.8" />
+    <circle cx="160" cy="68" r="3.5" fill="currentColor" fillOpacity="0.8" />
+    <circle cx="220" cy="68" r="3.5" fill="currentColor" fillOpacity="0.8" />
+    <circle cx="290" cy="68" r="3.5" fill="currentColor" fillOpacity="0.8" />
+    <circle cx="348" cy="68" r="3.5" fill="currentColor" fillOpacity="0.8" />
+    <text x="92" y="92" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.6">-8</text>
+    <text x="220" y="92" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.6">0</text>
+    <text x="348" y="92" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.6">+8</text>
+    <text x="378" y="71" fontSize="9" fill="#3B82F6" textAnchor="start">幅 ≈ √dₖ = 8</text>
+    <line x1="150" y1="100" x2="150" y2="138" stroke="currentColor" strokeOpacity="0.55" strokeWidth="1.4" markerEnd="url(#shrinkA)" />
+    <defs>
+      <marker id="shrinkA" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="currentColor" fillOpacity="0.6" />
+      </marker>
+    </defs>
+    <text x="160" y="123" fontSize="9" fill="currentColor" textAnchor="start">÷√dₖ（=÷8）で縮小</text>
+    <text x="70" y="152" fontSize="9" fill="currentColor" textAnchor="start" fillOpacity="0.85">割った後</text>
+    <rect x="204" y="158" width="32" height="20" rx="2" fill="#3B82F6" fillOpacity="0.30" stroke="#3B82F6" strokeOpacity="0.6" strokeWidth="1" />
+    <line x1="70" y1="168" x2="370" y2="168" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1" />
+    <circle cx="204" cy="168" r="3.5" fill="currentColor" fillOpacity="0.8" />
+    <circle cx="220" cy="168" r="3.5" fill="currentColor" fillOpacity="0.8" />
+    <circle cx="236" cy="168" r="3.5" fill="currentColor" fillOpacity="0.8" />
+    <text x="204" y="192" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.6">-1</text>
+    <text x="236" y="192" fontSize="8" fill="currentColor" textAnchor="middle" fillOpacity="0.6">+1</text>
+    <text x="378" y="171" fontSize="9" fill="#3B82F6" textAnchor="start">幅 = 1</text>
+  </svg>
+  <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>$\sqrt{d_k}$ で割ると、散らばりの幅が $\sqrt{d_k}$ 倍ぶんだけ縮み、ちょうど 1 に揃う（縮小コピーのイメージ）</figcaption>
+</figure>
+
+式で書くと（$\sigma$ ＝標準偏差）こうなります。
+
+$$
+\sigma\!\left(\frac{\text{スコア}}{\sqrt{d_k}}\right) = \frac{\sigma(\text{スコア})}{\sqrt{d_k}} = \frac{\sqrt{d_k}}{\sqrt{d_k}} = 1
+$$
+
+割る前のばらつきが $\sqrt{d_k}$、それを $\sqrt{d_k}$ で割るので、ちょうど $1$ になります。
+
+式だけだとイメージしにくいので、**小さな数で実際に計算**してみましょう。$d_k = 4$ のモデルで、あるクエリのスコアが2つ、$-2$ と $+2$ だったとします（このとき $\sqrt{d_k} = \sqrt{4} = 2$）。スコアを $\sqrt{d_k}=2$ で割る前と後で、標準偏差を計算して比べます。
+
+| | 割る前のスコア | $\sqrt{d_k}=2$ で割った後 |
+| --- | --- | --- |
+| スコア | $-2,\ +2$ | $-1,\ +1$ |
+| 平均 | $0$ | $0$ |
+| 平均からのズレ | $-2,\ +2$ | $-1,\ +1$ |
+| 分散（ズレ²の平均） | $\dfrac{(-2)^2+2^2}{2}=4$ | $\dfrac{(-1)^2+1^2}{2}=1$ |
+| 標準偏差 $\sigma$ | $\sqrt{4}=2$ | $\sqrt{1}=1$ |
+
+割る前の標準偏差は $2$（＝$\sqrt{d_k}$）、$2$ で割った後は $1$。たしかに **スコアを $2$ で割ったら、標準偏差も $2$ で割られて、ちょうど $1$ になりました**。式の $\frac{\sqrt{d_k}}{\sqrt{d_k}}=1$ は、これを文字に置きかえただけのものです。
+
+次元が大きくても、まったく同じことが起きます。
+
+- $d_k = 64$：ばらつき $8$ を $\sqrt{64}=8$ で割る → $1$
+- $d_k = 512$：ばらつき $\approx 22.6$ を $\sqrt{512}\approx 22.6$ で割る → $\approx 1$
+
+どの次元でも割ったあとのばらつきは $1$ に揃います。だから次元 $d_k$ を変えても、softmax に入るスコアの振れ幅はいつも同じ手頃なサイズ（およそ $\pm 1$）に保たれ、7.1 で見た飽和を避けられるのです。
+
+:::
+
+:::note[“分散が次元の数だけ足し合わさる”ってどういうこと？]
+
+サイコロ1個の出目はばらつきますが、100 個振って合計すると、合計値はもっと大きな幅でばらつきます（だいたい「個数の平方根」倍に広がる）。内積も同じで、独立な項 $q_i k_i$ を $d_k$ 個足すほど、合計であるスコアの振れ幅が大きくなります。分散（ばらつきの2乗）が $d_k$ 倍、標準偏差が $\sqrt{d_k}$ 倍、というわけです。
+
+なお、この「各成分が平均0・分散1で独立」という前提は厳密には成り立ちませんが、**スケーリングの動機**を理解するにはこの近似で十分です。元論文 "Attention Is All You Need" でも、この分散の議論を根拠に $\sqrt{d_k}$ で割ることが提案されています。
+
+:::
+
+### 7.3 スケーリングしないとどうなるか（数値で体感）
+
+4.4 節で使ったスコア $a' = (2,\ 0,\ 1)$ は、実はすでに「ほどよい大きさ」になっていました。もし $d_k = 64$ のモデルで**スケーリングをサボった**場合、生のスコアは標準偏差 $\sqrt{64}=8$ くらいまで膨らみ、たとえば $(16,\ 0,\ 8)$ のような値になります。同じ「向きの相性」なのに、大きさだけが $8$ 倍になったイメージです。
+
+この2つを softmax に通すと、結果はまるで違います。
+
+$$
+\text{softmax}(16,\ 0,\ 8) \approx (1.000,\ 0.000,\ 0.000), \qquad
+\text{softmax}(2,\ 0,\ 1) \approx (0.665,\ 0.090,\ 0.245)
+$$
+
+スケーリングしない左は **1か所に全振り**（飽和）してしまい、他の単語の情報をいっさい拾えません。$\sqrt{d_k}=8$ で割った右（＝ $(2,0,1)$）は、強弱をつけつつ他もちゃんと残した、ほどよい配分になっています。
+
+<div style={{display: 'flex', flexWrap: 'wrap', gap: '1.5rem', justifyContent: 'center', alignItems: 'flex-start', margin: '1.25rem 0'}}>
+  <figure style={{margin: 0, textAlign: 'center'}}>
+    <svg viewBox="0 0 220 165" width="215" role="img" aria-label="スケーリングなしの softmax は1か所に全振りして飽和する">
+      <line x1="28" y1="115" x2="200" y2="115" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1" />
+      <rect x="45" y="32" width="34" height="83" fill="#EF4444" fillOpacity="0.30" stroke="#EF4444" strokeOpacity="0.65" strokeWidth="1.2" />
+      <rect x="100" y="113" width="34" height="2" fill="#EF4444" fillOpacity="0.30" stroke="#EF4444" strokeOpacity="0.65" strokeWidth="1.2" />
+      <rect x="155" y="113" width="34" height="2" fill="#EF4444" fillOpacity="0.30" stroke="#EF4444" strokeOpacity="0.65" strokeWidth="1.2" />
+      <text x="62" y="26" fontSize="9" fill="currentColor" textAnchor="middle">1.000</text>
+      <text x="117" y="108" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.7">0.000</text>
+      <text x="172" y="108" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.7">0.000</text>
+      <text x="62" y="128" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.8">a₁</text>
+      <text x="117" y="128" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.8">a₂</text>
+      <text x="172" y="128" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.8">a₃</text>
+      <text x="113" y="152" fontSize="10" fill="#EF4444" textAnchor="middle">スコア (16, 0, 8)：飽和</text>
+    </svg>
+    <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>① スケーリングなし：1か所に全振りし、他の情報を拾えない</figcaption>
+  </figure>
+  <figure style={{margin: 0, textAlign: 'center'}}>
+    <svg viewBox="0 0 220 165" width="215" role="img" aria-label="√dk でスケーリングした softmax はほどよい配分になる">
+      <line x1="28" y1="115" x2="200" y2="115" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1" />
+      <rect x="45" y="60" width="34" height="55" fill="#3B82F6" fillOpacity="0.30" stroke="#3B82F6" strokeOpacity="0.65" strokeWidth="1.2" />
+      <rect x="100" y="108" width="34" height="7" fill="#3B82F6" fillOpacity="0.30" stroke="#3B82F6" strokeOpacity="0.65" strokeWidth="1.2" />
+      <rect x="155" y="95" width="34" height="20" fill="#3B82F6" fillOpacity="0.30" stroke="#3B82F6" strokeOpacity="0.65" strokeWidth="1.2" />
+      <text x="62" y="54" fontSize="9" fill="currentColor" textAnchor="middle">0.665</text>
+      <text x="117" y="102" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.8">0.090</text>
+      <text x="172" y="89" fontSize="9" fill="currentColor" textAnchor="middle">0.245</text>
+      <text x="62" y="128" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.8">a₁</text>
+      <text x="117" y="128" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.8">a₂</text>
+      <text x="172" y="128" fontSize="9" fill="currentColor" textAnchor="middle" fillOpacity="0.8">a₃</text>
+      <text x="113" y="152" fontSize="10" fill="#3B82F6" textAnchor="middle">÷√64 → (2, 0, 1)：ほどよい</text>
+    </svg>
+    <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>② $\sqrt{d_k}$ でスケーリング：強弱をつけつつ他の情報も残る</figcaption>
+  </figure>
+</div>
+
+同じ「向きの相性」から出発しても、スケーリングの有無で注目度がここまで変わります。**だから実用の Transformer は必ず $\sqrt{d_k}$ で割る**、というわけです。
+
+### 7.4 実装
+
+理由が分かったところで、コードにします。6 節にわり算を1つ足すだけです。Query が複数（行列 $Q$）になっても、同じ式がそのまま動きます。
 
 ```python
 def softmax_rows(x):
