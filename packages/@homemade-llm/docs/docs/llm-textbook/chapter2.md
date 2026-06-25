@@ -1233,26 +1233,411 @@ print(output.shape)        # (3, 4)
 
 :::
 
-:::tip[この章のまとめ]
+## 9. （発展）PyTorch で実装する
 
-**前半（概念）**
+ここまでは仕組みを理解するために **NumPy** で書いてきました。最後に、実際の LLM 開発で標準的に使われる **PyTorch** でも、同じ3つ——**内積アテンション → スケール化内積アテンション → マルチヘッドアテンション**——を書いてみましょう。コードはどれも NumPy 版とほとんど同じ数行です。
+
+:::note[なぜ NumPy ではなく PyTorch なのか]
+
+NumPy でも計算自体はできますが、実際にモデルを **学習**させるには PyTorch（や JAX・TensorFlow）が要ります。理由は2つです。
+
+- **自動微分（autograd）**：学習では「重み $W_Q, W_K, \dots$ をどちらに動かせば良くなるか（勾配）」を計算する必要があります。PyTorch はこの微分を**自動で**やってくれます（NumPy にはこの機能がありません）。
+- **GPU で速い**：`.to("cuda")` でテンソルを GPU に載せるだけで、巨大な行列積が一気に並列計算されます。
+
+書き味は NumPy とそっくりです。`np.array` が `torch.tensor` に、`@`（行列積）はそのまま。最初は「NumPy の置きかえ」くらいの気持ちで読んで大丈夫です。手元で動かすなら [Google Colab](https://colab.research.google.com/?hl=ja) なら PyTorch がはじめから入っています（ローカルなら `pip install torch`）。
+
+:::
+
+### 9.1 内積アテンション（スケーリングなし）
+
+まずは 6 節の素朴な内積アテンション $o = \text{softmax}(qK^{\top})V$ を PyTorch で書きます。数値も 4.4 節と同じものを使うので、答えが一致するか確かめられます。
+
+```python
+import torch
+import torch.nn.functional as F
+
+# 4.4 節と同じ数値。np.array の代わりに torch.tensor を使うだけ
+q = torch.tensor([1.0, 0.0, 1.0])
+K = torch.tensor([
+    [1.0, 0.0, 1.0],   # k1
+    [0.0, 1.0, 0.0],   # k2
+    [1.0, 1.0, 0.0],   # k3
+])
+V = K                          # 本章では Value = Key
+
+scores = q @ K.T               # ① 内積でスコア → tensor([2., 0., 1.])
+weights = F.softmax(scores, dim=-1)   # ② softmax で注目度（合計1）
+o = weights @ V                # ③ Value の加重和
+print(o)                       # tensor([0.9100, 0.3350, 0.6650])
+```
+
+NumPy 版との違いは、たった3点です。
+
+| やること | NumPy | PyTorch |
+| --- | --- | --- |
+| データの入れ物 | `np.array(...)` | `torch.tensor(...)` |
+| softmax | 自前で `def softmax` を書いた | 組み込みの `F.softmax` を呼ぶだけ |
+| 軸の指定 | `axis=-1` | `dim=-1` |
+
+ポイントは `F.softmax(scores, dim=-1)` の **`dim=-1`** です。「**いちばん最後の軸（次元）に沿って合計1にする**」という指定で、NumPy の `axis=-1` と同じ意味です。スコアが1本のベクトルなら最後の軸はその要素方向なので、`[2, 0, 1]` 全体が合計1の注目度 `[0.665, 0.090, 0.245]` に変換され、出力 `o` は手計算の $(0.910,\ 0.335,\ 0.665)$ とぴたり一致します🎉
+
+:::note[`torch.tensor` ってなに？]
+
+PyTorch でのデータの入れ物が **テンソル（tensor）** です。中身は NumPy 配列とほぼ同じ「多次元の数の並び」ですが、上で触れた **自動微分**と **GPU 実行**に対応している点が違います。`q @ K.T`（行列積）、`.shape`（形の確認）、`.T`（転置）など、NumPy で使った操作の多くがそのまま使えます。
+
+:::
+
+#### 別の書き方：`nn.Module` クラス＋バッチ対応
+
+上のコードは「1文・1クエリ」を最短で計算する書き方でした。実際の本やライブラリでは、次のように **`nn.Module` を継承したクラス**として書き、**複数の文をまとめて（バッチで）**処理できる形にするのが一般的です。9.3 のマルチヘッド実装ともそのままつながる書き方なので、ここで紹介しておきます。
+
+```python
+import torch
+from torch import Tensor, nn
+
+
+class DotProductAttention(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, query: Tensor, key: Tensor, value: Tensor) -> Tensor:
+        """内積アテンションの計算を行う.
+
+        Args:
+            query (Tensor): クエリ. shape は (batch_size, query_len, d_model).
+            key   (Tensor): キー.   shape は (batch_size, key_len,   d_model).
+            value (Tensor): バリュー. shape は (batch_size, value_len, d_model).
+        """
+        # 1. query と key から (batch_size, query_len, key_len) のスコアを計算
+        score = torch.bmm(query, key.transpose(1, 2))
+        # 2. 重みの和が 1 になるように softmax を計算
+        weight = torch.softmax(score, dim=-1)
+        # 3. value の重み付き和を計算
+        output = torch.bmm(weight, value)
+        return output
+```
+
+使うときは、まずインスタンスを作って、そこに Query・Key・Value を渡します。
+
+```python
+attn = DotProductAttention()
+# バッチ2文・各3トークン・d_model=4 のダミー入力
+query = torch.randn(2, 3, 4)
+key   = torch.randn(2, 3, 4)
+value = torch.randn(2, 3, 4)
+output = attn(query, key, value)   # forward が呼ばれる
+print(output.shape)                # torch.Size([2, 3, 4])
+```
+
+中身は 9.1 の3ステップ（内積 → softmax → 加重和）とまったく同じです。新しく出てくるのは「**バッチ**」と「**`torch.bmm`**」の2つだけなので、そこを押さえれば読めます。
+
+:::note[「バッチ」次元 ＝ 何文かをまとめて処理する]
+
+9.1 の最初のコードは入力が1文ぶん（2次元）でしたが、こちらは形が `(batch_size, 系列長, d_model)` の **3次元**になっています。先頭の `batch_size` が **バッチ**——「いちどに処理する文の本数」です。
+
+学習では、1文ずつ計算するより **何十・何百文をまとめて**計算したほうが GPU を活かせて圧倒的に速くなります。そのため実用のコードは、ほぼ必ずこのバッチ次元を先頭に付けた形で書かれます。「文が1本増えても、各文に対して同じ計算をするだけ」なので、考え方は 9.1 と変わりません。
+
+:::
+
+:::note[`torch.bmm`（バッチ行列積）とは]
+
+`torch.bmm` は **batch matrix multiply（バッチ行列積）** の略で、「**バッチの中の各文について、行列積を独立にまとめて行う**」関数です。形でいうと、
+
+$$
+(\text{batch},\ a,\ b) \;\times\; (\text{batch},\ b,\ c) \;\rightarrow\; (\text{batch},\ a,\ c)
+$$
+
+のように、先頭のバッチ次元はそのまま、後ろの2軸だけで行列積をします。コードの1行目では
+
+- `query`：`(batch, query_len, d_model)`
+- `key.transpose(1, 2)`：`(batch, d_model, key_len)`（後述）
+
+を `bmm` して、`(batch, query_len, key_len)` の **スコア行列**——全クエリ × 全キーの内積（$QK^{\top}$）——を文ごとに一括計算しています。3行目も同様に、注目度 `(batch, query_len, key_len)` と value `(batch, key_len, d_model)` を `bmm` して、加重和の出力 `(batch, query_len, d_model)` を得ます。
+
+9.1 で使った `@`（`torch.matmul`）でも同じ計算はできます。`bmm` は「**入力がちょうど3次元（バッチ＋行列）であることを前提にした専用版**」だと思ってください。
+
+:::
+
+`key.transpose(1, 2)` は、9.2 で出てくる `transpose(-2, -1)` と同じく **最後の2軸の入れ替え**です。`key` は `(batch_size, key_len, d_model)` の3次元なので、軸 1（`key_len`）と軸 2（`d_model`）を入れ替えて `(batch_size, d_model, key_len)` にし、$QK^{\top}$ の「$K^{\top}$」を作っています。`softmax(score, dim=-1)` の `dim=-1` は最後の軸（`key_len`）方向の正規化で、9.1 と同じく「各クエリについて、全キーへの注目度を合計1にする」という意味です。
+
+:::tip[なぜ 1 文版と 2 通り見せるのか]
+
+最初の `q @ K.T` 版は **3ステップの本質**を最短で見るため、こちらのクラス版は **実際のコードの形（バッチ・`nn.Module`）** に慣れるためのものです。中身は同じなので、「短い版で仕組みを理解 → クラス版で実物に橋渡し」という順で読むと、9.3 のマルチヘッド実装（`nn.Module` ＋バッチ＋ヘッド軸）がすっと入ってきます。
+
+:::
+
+### 9.2 スケール化内積アテンション
+
+次に、7 節で足した $\sqrt{d_k}$ のスケーリングを入れます。やることは「スコアを $\sqrt{d_k}$ で割る」だけです。
+
+```python
+import math
+
+def scaled_dot_product_attention(Q, K, V):
+    d_k = K.shape[-1]                              # Key の次元
+    scores = Q @ K.transpose(-2, -1) / math.sqrt(d_k)   # スケール化したスコア
+    weights = F.softmax(scores, dim=-1)            # 行ごとに softmax
+    return weights @ V
+
+# クエリが複数（2個）でも同じ関数でOK
+Q = torch.tensor([[1.0, 0.0, 1.0],
+                  [0.0, 1.0, 1.0]])
+print(scaled_dot_product_attention(Q, K, V))
+```
+
+7.4 の NumPy 版とほぼ同じですが、転置を `K.T` ではなく **`K.transpose(-2, -1)`** で書いている点に注目してください。
+
+:::note[なぜ `.T` ではなく `.transpose(-2, -1)` なのか]
+
+`.T` は2次元（行列）の転置には使えますが、後の 9.3 で出てくるような **3次元以上のテンソル**（バッチやヘッドの軸が付いたもの）ではうまくいきません。`transpose(-2, -1)` は「**最後の2つの軸だけを入れ替える**」という指定で、前にバッチやヘッドの軸がいくつ付いていても、Key の「トークン × 次元」の部分だけを正しく転置できます。最初からこの書き方に慣れておくと、マルチヘッドでもそのまま通用します。
+
+:::
+
+#### 別の書き方：`nn.Module` クラス版（スケール化）
+
+9.1 の `DotProductAttention` と同じ要領で、スケール化版も **`nn.Module` クラス＋バッチ対応**で書けます。9.1 のクラスに **スケーリングの1行を足すだけ**です。
+
+```python
+class ScaledDotProductAttention(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, query: Tensor, key: Tensor, value: Tensor) -> Tensor:
+        """スケール化内積アテンションの計算を行う.
+
+        Args:
+            query (Tensor): クエリ. shape は (batch_size, query_len, d_model).
+            key   (Tensor): キー.   shape は (batch_size, key_len,   d_model).
+            value (Tensor): バリュー. shape は (batch_size, value_len, d_model).
+        """
+        # query の次元（= キーの次元）でスケーリング
+        d_k = query.size(-1)
+        score = torch.bmm(query, key.transpose(1, 2)) / (d_k ** 0.5)
+        # 注目度の計算
+        weight = torch.softmax(score, dim=-1)
+        # アテンション出力（Value の加重和）の計算
+        output = torch.bmm(weight, value)
+        return output
+```
+
+9.1 のクラスと見比べると、増えたのは `d_k = query.size(-1)` と、スコアを `/ (d_k ** 0.5)` で割る部分だけ。これがまさに 7 節の $\dfrac{QK^{\top}}{\sqrt{d_k}}$ です。バッチや `torch.bmm` の意味は 9.1 のコラムのとおりで、変わりません。
+
+:::note[`query.size(-1)` と `d_k ** 0.5` という書き方]
+
+同じことを表す書き方が PyTorch には複数あります。どれを使っても結果は同じなので、本やコードによって見た目が違っても戸惑わなくて大丈夫です。
+
+- **次元数の取り方**：`query.size(-1)` は「最後の軸の大きさ（＝ $d_k$）」を返します。NumPy ふうの `query.shape[-1]` と同じ意味です。
+- **平方根**：`d_k ** 0.5` は「$d_k$ の 0.5 乗 ＝ $\sqrt{d_k}$」。`math.sqrt(d_k)` や `torch.sqrt(...)` と同じです。
+
+:::
+
+実は PyTorch 2.0 以降には、これと同じ計算をしてくれる **組み込み関数**が用意されています。実用ではこちらを使うのが定番です。
+
+```python
+# 自前実装と同じ結果。内部でスケーリング・softmax・加重和をまとめて行う
+o = F.scaled_dot_product_attention(Q, K, V)
+print(o)
+```
+
+:::tip[組み込みの `F.scaled_dot_product_attention` が速い理由]
+
+この組み込み関数は、スコア計算・$\sqrt{d_k}$ のスケーリング・softmax・Value の加重和を **1つの最適化された処理（FlashAttention などの高速実装）にまとめて**実行します。さらに、後の章で出てくる「未来の単語を見ないようにする **マスク**」や、過学習を防ぐ **dropout** もオプションで指定できます。仕組みを理解した今なら、この関数が中で何をしているかが分かるはずです——まさに 9.1〜9.2 でやったことそのものです。
+
+:::
+
+### 9.3 マルチヘッドアテンション
+
+最後に、8 節のマルチヘッドアテンションを PyTorch で書きます。ここでは、学習可能な層をまとめる **`nn.Module`** という仕組みを使い、再利用できる部品（クラス）として作ります。
+
+```python
+import torch.nn as nn
+
+class MultiHeadAttention(nn.Module):
+    def __init__(self, d_model, num_heads):
+        super().__init__()
+        assert d_model % num_heads == 0      # 割り切れることが前提
+        self.num_heads = num_heads
+        self.d_k = d_model // num_heads       # 各ヘッドの次元
+
+        # Q/K/V/出力の射影。それぞれ「重み行列を持った線形変換」
+        self.W_q = nn.Linear(d_model, d_model)
+        self.W_k = nn.Linear(d_model, d_model)
+        self.W_v = nn.Linear(d_model, d_model)
+        self.W_o = nn.Linear(d_model, d_model)   # 出力射影 W_O
+
+    def forward(self, x):
+        B, T, _ = x.shape    # (バッチ, トークン数, d_model)
+
+        # ① 射影して、(B, num_heads, T, d_k) の形にヘッド分割
+        q = self.W_q(x).view(B, T, self.num_heads, self.d_k).transpose(1, 2)
+        k = self.W_k(x).view(B, T, self.num_heads, self.d_k).transpose(1, 2)
+        v = self.W_v(x).view(B, T, self.num_heads, self.d_k).transpose(1, 2)
+
+        # ② 全ヘッドで一括して Scaled Dot-Product Attention
+        out = F.scaled_dot_product_attention(q, k, v)   # (B, num_heads, T, d_k)
+
+        # ③ ヘッドを連結して (B, T, d_model) に戻す
+        out = out.transpose(1, 2).contiguous().view(B, T, -1)
+
+        # ④ 出力射影で、ヘッドをまたいで混ぜる
+        return self.W_o(out)
+
+# d_model=4・ヘッド2個。入力は バッチ1・3トークン・4次元
+mha = MultiHeadAttention(d_model=4, num_heads=2)
+x = torch.randn(1, 3, 4)
+print(mha(x).shape)          # torch.Size([1, 3, 4])
+```
+
+NumPy 版（8.5）と見た目はだいぶ違いますが、やっていることは **8.2 の4ステップそのまま**です。対応を表で並べます。
+
+| 8.2 のステップ | コードの該当部分 | 何をしているか |
+| --- | --- | --- |
+| ① 分ける（射影） | `self.W_q(x)` ＋ `.view(...).transpose(1, 2)` | 射影してから、ヘッドごとの軸に分割 |
+| ② 別々に注目 | `F.scaled_dot_product_attention(q, k, v)` | 全ヘッドぶんの Attention を一括計算 |
+| ③ つなげる（連結） | `.transpose(1, 2).contiguous().view(B, T, -1)` | ヘッドの軸を畳んで1本に戻す |
+| ④ 混ぜる（出力射影） | `self.W_o(out)` | $W_O$ をかけてヘッドをまたいで混ぜる |
+
+NumPy 版と比べたときの、新しくて分かりにくいところを3つ補足します。
+
+:::note[`nn.Linear` は「重み行列をかける」の PyTorch 版]
+
+`nn.Linear(d_model, d_model)` は、**入力に重み行列をかけて変換する層**です（前章の線形変換そのもの）。NumPy 版では `W_Q[i]` をヘッドごとに用意しましたが、PyTorch では `nn.Linear` 1枚で **全ヘッドぶんの射影をまとめて**行い、あとから `view` でヘッドに切り分けます（こうすると行列積が1回で済んで速い）。`nn.Linear` が持つ重みは、学習で自動的に更新されます。
+
+:::
+
+:::note[`view` と `transpose` でヘッドに分ける]
+
+射影直後の形は `(B, T, d_model)` です。これを `view(B, T, num_heads, d_k)` で「`d_model` を `num_heads × d_k` に割り直し」、さらに `transpose(1, 2)` でヘッドの軸を前に出して `(B, num_heads, T, d_k)` にします。こうすると、`F.scaled_dot_product_attention` が **ヘッドごとに独立して**（最後の2軸 `T × d_k` で）Attention を計算してくれます。`-1` を使った `view(B, T, -1)` は「残りの次元はよしなに埋めて」の意味で、ここでは `num_heads × d_k = d_model` に戻ります。
+
+:::
+
+:::note[連結の前に `.contiguous()` が必要なわけ]
+
+`transpose` は、データを実際に並べ替えるのではなく「**見え方（軸の順番）だけ**」を変えます。そのため直後に `view` で形を変えようとすると、メモリの並びが連続していなくてエラーになることがあります。`.contiguous()` は「いまの見え方どおりにメモリを並べ直す」操作で、これを挟むと `view` が安全に通ります。お決まりの1手と覚えておけば十分です。
+
+:::
+
+ここでも、**出力の形は入力と同じ `(1, 3, 4)`**（バッチ・トークン数・$d_{\text{model}}$）です。8.5 の NumPy 版と同じく「同じ形のブロック」になっているので、何段も積み重ねられます。
+
+#### 別の書き方：ヘッドをクラスに分けて `nn.ModuleList` で束ねる
+
+上の `MultiHeadAttention` は、速さを優先して **全ヘッドを1枚の `nn.Linear` に詰め込み、`view`／`transpose` でヘッドに切り分ける**書き方でした。一方、本やライブラリでは、**「1ヘッド＝1つのクラス」を作り、それを複数束ねる**という、より素直な書き方もよく使われます。8.5 の NumPy 版（`for` ループで各ヘッドを計算 → `np.concatenate`）に、いちばん近いのはこちらです。
+
+まず、**1つぶんのヘッド**を `AttentionHead` クラスにします。中身は「Q・K・V を小さな次元へ射影 → 9.2 の `ScaledDotProductAttention` に渡す」だけです。
+
+```python
+class AttentionHead(nn.Module):
+    def __init__(self, d_k: int, d_v: int, d_model: int) -> None:
+        """MultiHeadAttention のヘッド.
+
+        Args:
+            d_k (int): クエリ・キーの次元数
+            d_v (int): バリューの次元数
+            d_model (int): モデルの埋め込み次元数
+        """
+        super().__init__()
+        # Q・K・V を、このヘッド専用の部分空間へ射影する線形層
+        self.linear_q = nn.Linear(d_model, d_k)
+        self.linear_k = nn.Linear(d_model, d_k)
+        self.linear_v = nn.Linear(d_model, d_v)
+        self.attention = ScaledDotProductAttention()   # 9.2 のクラスを再利用
+
+    def forward(self, query: Tensor, key: Tensor, value: Tensor) -> Tensor:
+        """単一ヘッドのアテンションを計算する."""
+        query = self.linear_q(query)   # (batch, query_len, d_k)
+        key   = self.linear_k(key)     # (batch, key_len,   d_k)
+        value = self.linear_v(value)   # (batch, value_len, d_v)
+        output = self.attention(query, key, value)
+        return output
+```
+
+次に、この `AttentionHead` を **`n_heads` 個ならべて束ね**、出力を連結して `linear_o` で混ぜれば、マルチヘッドの完成です。
+
+```python
+class MultiHeadAttention(nn.Module):
+    def __init__(self, n_heads: int, d_k: int, d_v: int, d_model: int) -> None:
+        super().__init__()
+        # ヘッドを n_heads 個ぶんリストにして保持
+        self.heads = nn.ModuleList(
+            [AttentionHead(d_k, d_v, d_model) for _ in range(n_heads)]
+        )
+        # 連結した出力を混ぜる線形層（W_O）
+        self.linear_o = nn.Linear(n_heads * d_v, d_model)
+
+    def forward(self, query: Tensor, key: Tensor, value: Tensor) -> Tensor:
+        # ① 各ヘッドで別々にアテンションを計算（8.5 の for ループそのもの）
+        head_out = [head(query, key, value) for head in self.heads]
+        # ② ヘッドを最後の軸で連結（Concat）
+        head_out = torch.cat(head_out, dim=-1)   # (batch, query_len, n_heads*d_v)
+        # ③ W_O で混ぜて出力（batch, query_len, d_model）
+        output = self.linear_o(head_out)
+        return output
+```
+
+8.2 の4ステップとの対応は、こちらのほうが**見た目もそのまま**です。
+
+| 8.2 のステップ | コードの該当部分 |
+| --- | --- |
+| ① 分ける（射影） | `AttentionHead` 内の `linear_q/k/v` |
+| ② 別々に注目 | `[head(...) for head in self.heads]`（ヘッドごとに計算） |
+| ③ つなげる（連結） | `torch.cat(head_out, dim=-1)` |
+| ④ 混ぜる（出力射影） | `self.linear_o(head_out)` |
+
+:::note[`nn.ModuleList` と `torch.cat` ってなに？]
+
+- **`nn.ModuleList`**：ただの Python リストではなく、**PyTorch が「学習対象の部品」として認識してくれるリスト**です。これで束ねておくと、中の全ヘッドの重み（各 `linear_q/k/v`）が学習でちゃんと更新されます。普通の `[...]` に入れると追跡されないので、サブモジュールを並べるときは `nn.ModuleList` を使うのがお約束です。
+- **`torch.cat(..., dim=-1)`**：テンソルを **最後の軸方向につなげる**関数で、まさに 8.3 の $\text{Concat}$ そのもの。各ヘッドの出力 `(batch, query_len, d_v)` を `n_heads` 個つなげて `(batch, query_len, n_heads*d_v)` にします。9.3 冒頭の版では `transpose`＋`view` でやっていた連結を、ここでは素直に `cat` 1発でやっています。
+
+:::
+
+:::tip[2つの書き方、どっちが正解？]
+
+どちらも結果は同じで、**正解は1つではありません**。使い分けの目安はこうです。
+
+- **クラス分割版（こちら）**：`AttentionHead` という単位ができて **読みやすく、8 節の概念とそのまま対応**。学習や実験で構造をいじりたいときに分かりやすい。
+- **1枚にまとめた版（9.3 冒頭）**：行列積が1回で済むので **速い**。大規模モデルの実装はたいていこちら寄り。
+
+まずはクラス分割版で「何をしているか」をつかみ、速度が要るときにまとめた版へ——という理解でOKです。
+
+:::
+
+:::tip[実用では `nn.MultiheadAttention` 一発]
+
+上のクラスは仕組みを理解するための手書き版です。実際の開発では、PyTorch 標準の **`nn.MultiheadAttention`** を使えば同じことが1行で書けます。
+
+```python
+mha = nn.MultiheadAttention(embed_dim=4, num_heads=2, batch_first=True)
+out, attn_weights = mha(x, x, x)   # Self-Attention は Q=K=V=x（同じ入力を3回渡す）
+print(out.shape)                   # torch.Size([1, 3, 4])
+```
+
+`batch_first=True` は「入力の形を `(バッチ, トークン, 次元)` で渡す」指定です。`x` を3回渡しているのは、Query・Key・Value をすべて同じ文章から作る **Self-Attention**（3.5）だから。返り値は出力と、おまけの **注目度（attention weights）** で、後者を覗くと「どのヘッドがどの単語に注目したか」を可視化できます。
+
+:::
+
+## 10. この章のまとめ
+
+### 前半（概念）
 
 - Transformer は「全単語ペアの注目度を一気に計算する」アーキテクチャで、いまの LLM の土台。RNN の「遅い・遠い単語を忘れる」を、「順番に読むのをやめる」ことで解決した。
 - 心臓部の **Attention** は、**内積で関連度 → softmax で注目度 → Value の加重和** という、前章の数学そのもの。
 
-**後半（実装）**
+### 後半（実装）
 
 - 注目度は $a_i = \dfrac{\exp(q k_i^{\top})}{\sum_j \exp(q k_j^{\top})}$。内積を softmax に通したスカラで、合計1。
 - 出力は Value の加重和 $o = a_1 v_1 + \dots + a_n v_n$。注目した Value が濃く混ざった「新しい表現」。
 - 行列でまとめると $o = \text{softmax}(qK^{\top})V$。NumPy では `softmax(q @ K.T) @ V` の数行で実装でき、手計算と一致する。
 - 実用形は $\sqrt{d_k}$ で割る **スケール化内積アテンション** $\text{softmax}\!\left(\frac{QK^{\top}}{\sqrt{d_k}}\right)V$。
 
-**発展（マルチヘッドアテンション）**
+### 発展（マルチヘッドアテンション）
 
 - 1つのヘッドは「1種類の関係」しか拾えないので、ヘッドを $h$ 個並べて別々の観点を担当させる。各ヘッドは次元 $d_k = d_{\text{model}}/h$ の小さな空間で、7 節の Attention をそのまま計算する。
 - $\text{MultiHead}(Q,K,V) = \text{Concat}(\text{head}_1,\dots,\text{head}_h)\,W_O$。連結で1本にまとめ、$W_O$ でヘッドをまたいで混ぜる。出力は入力と同じ $d_{\text{model}}$ 次元なので、ブロックとして積み重ねられる。
 
-:::
+### 発展（PyTorch 実装）
+
+- NumPy で書いた3つ（内積／スケール化／マルチヘッド）は、PyTorch でもほぼ同じ数行で書ける。`np.array`→`torch.tensor`、softmax は `F.softmax(..., dim=-1)`。
+- 実用では自動微分・GPU・高速化に対応した組み込み（`F.scaled_dot_product_attention`、`nn.MultiheadAttention`）を使う。仕組みを理解した今なら、その中身が 9.1〜9.3 でやったことだと分かる。
 
 ---
 
