@@ -159,6 +159,10 @@ const config: Config = {
               label: 'Chapter 2: Transformer',
               to: '/docs/llm-textbook/chapter2',
             },
+            {
+              label: 'Chapter 3: Transformer を組み立てる残りの部品',
+              to: '/docs/llm-textbook/chapter3',
+            },
           ],
         },
         {
