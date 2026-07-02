@@ -633,6 +633,98 @@ $\max(0, z)$ は **ReLU（Rectified Linear Unit）** と呼ばれ、「入力が
   <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>いったん広い空間に持ち上げ、ReLU で非線形に加工してから、元の次元に戻す</figcaption>
 </figure>
 
+#### なぜこれで賢くなるのか：質問して、選別して、組み合わせ直す
+
+「広げて → 非線形 → 戻す」が**何をしているのか**を、もう一段かみくだきます。キーワードは「**質問と選別**」です。
+
+**① 広げる ＝ 質問をたくさん並べる。** $xW_1$ で得られる中間ベクトルの各成分 $h_j$ は、実は
+
+$$
+h_j = x \cdot (W_1 \text{ の第 } j \text{ 列})
+$$
+
+という**内積**です。内積は「似ているほど大きくなる」量でした（[Chapter 1](./chapter1.md)）。つまり $W_1$ の各列は「**この単語、〇〇っぽい？**」という**質問ベクトル**で、$h_j$ はその質問への回答（似ている度合い）です。「動物っぽい？」「動作を表す？」「否定文の中にいる？」——そんな質問係が $d_{\text{ff}}$ 人並んでいて（質問の中身は学習が勝手に決めます）、一斉に $x$ をチェックする。$d_{\text{model}}$ から $d_{\text{ff}} = 4 \times d_{\text{model}}$ に広げるのは、**質問の数を増やして多角的に調べる**ためです。
+
+**② ReLU ＝「いいえ」を捨てる選別。** 回答が負（＝似ていない・当てはまらない）の質問を $0$ に切り捨てます。すると**入力によって「生き残る質問」が変わる**。動物の話なら質問1が生き残り、動作の話なら質問4が生き残る——つまり、**入力の内容に応じて実質的に違う変換が適用される**のです。
+
+**③ 戻す ＝「はい」の回答を組み合わせる。** $W_2$ は、生き残った回答を「じゃあ出力のこの方向を強めよう」と合成して、$d_{\text{model}}$ 次元の新しい表現に翻訳し直します。
+
+<figure style={{margin: '1.5rem auto', textAlign: 'center', maxWidth: '560px'}}>
+  <svg viewBox="0 0 520 240" width="100%" role="img" aria-label="質問への回答を ReLU が選別し、生き残った回答を合成する流れ">
+    <defs>
+      <marker id="ffnSelArrow" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="currentColor" fillOpacity="0.55" />
+      </marker>
+    </defs>
+    {/* 入力 x */}
+    <rect x="8" y="96" width="54" height="34" rx="6" fill="currentColor" fillOpacity="0.08" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1.2" />
+    <text x="35" y="117" fontSize="12" fill="currentColor" textAnchor="middle" fontStyle="italic">x</text>
+    {/* 入力から各質問への線 */}
+    <line x1="62" y1="110" x2="108" y2="45" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.1" />
+    <line x1="62" y1="110" x2="108" y2="90" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.1" />
+    <line x1="62" y1="110" x2="108" y2="135" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.1" />
+    <line x1="62" y1="110" x2="108" y2="180" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.1" />
+    {/* 質問と回答（xW1） */}
+    <text x="170" y="18" fontSize="10.5" fill="currentColor" textAnchor="middle">質問に回答（xW₁ ＝ 内積）</text>
+    <rect x="110" y="30" width="120" height="30" rx="5" fill="#3B82F6" fillOpacity="0.14" stroke="#3B82F6" strokeOpacity="0.7" strokeWidth="1.2" />
+    <text x="122" y="49" fontSize="10.5" fill="currentColor">質問1</text>
+    <text x="218" y="49" fontSize="11.5" fill="#3B82F6" textAnchor="end">＋1</text>
+    <rect x="110" y="75" width="120" height="30" rx="5" fill="#3B82F6" fillOpacity="0.14" stroke="#3B82F6" strokeOpacity="0.7" strokeWidth="1.2" />
+    <text x="122" y="94" fontSize="10.5" fill="currentColor">質問2</text>
+    <text x="218" y="94" fontSize="11.5" fill="#EF4444" textAnchor="end">−2</text>
+    <rect x="110" y="120" width="120" height="30" rx="5" fill="#3B82F6" fillOpacity="0.14" stroke="#3B82F6" strokeOpacity="0.7" strokeWidth="1.2" />
+    <text x="122" y="139" fontSize="10.5" fill="currentColor">質問3</text>
+    <text x="218" y="139" fontSize="11.5" fill="#EF4444" textAnchor="end">−3</text>
+    <rect x="110" y="165" width="120" height="30" rx="5" fill="#3B82F6" fillOpacity="0.14" stroke="#3B82F6" strokeOpacity="0.7" strokeWidth="1.2" />
+    <text x="122" y="184" fontSize="10.5" fill="currentColor">質問4</text>
+    <text x="218" y="184" fontSize="11.5" fill="#3B82F6" textAnchor="end">＋4</text>
+    {/* ReLU の関所 */}
+    <line x1="262" y1="22" x2="262" y2="205" stroke="currentColor" strokeOpacity="0.5" strokeWidth="1.3" strokeDasharray="5 4" />
+    <text x="262" y="222" fontSize="10.5" fill="currentColor" textAnchor="middle">ReLU（いいえ を捨てる）</text>
+    {/* 通過・遮断の矢印 */}
+    <line x1="232" y1="45" x2="292" y2="45" stroke="#10B981" strokeWidth="1.6" markerEnd="url(#ffnSelArrow)" />
+    <line x1="232" y1="90" x2="256" y2="90" stroke="#EF4444" strokeOpacity="0.7" strokeWidth="1.4" />
+    <text x="262" y="94" fontSize="12" fill="#EF4444" textAnchor="middle">✕</text>
+    <line x1="232" y1="135" x2="256" y2="135" stroke="#EF4444" strokeOpacity="0.7" strokeWidth="1.4" />
+    <text x="262" y="139" fontSize="12" fill="#EF4444" textAnchor="middle">✕</text>
+    <line x1="232" y1="180" x2="292" y2="180" stroke="#10B981" strokeWidth="1.6" markerEnd="url(#ffnSelArrow)" />
+    {/* 選別後 */}
+    <text x="330" y="18" fontSize="10.5" fill="currentColor" textAnchor="middle">選別後</text>
+    <rect x="296" y="30" width="66" height="30" rx="5" fill="#10B981" fillOpacity="0.2" stroke="#10B981" strokeWidth="1.3" />
+    <text x="329" y="49" fontSize="11.5" fill="currentColor" textAnchor="middle">＋1</text>
+    <rect x="296" y="75" width="66" height="30" rx="5" fill="currentColor" fillOpacity="0.05" stroke="currentColor" strokeOpacity="0.25" strokeWidth="1.1" />
+    <text x="329" y="94" fontSize="11.5" fill="currentColor" fillOpacity="0.45" textAnchor="middle">0</text>
+    <rect x="296" y="120" width="66" height="30" rx="5" fill="currentColor" fillOpacity="0.05" stroke="currentColor" strokeOpacity="0.25" strokeWidth="1.1" />
+    <text x="329" y="139" fontSize="11.5" fill="currentColor" fillOpacity="0.45" textAnchor="middle">0</text>
+    <rect x="296" y="165" width="66" height="30" rx="5" fill="#10B981" fillOpacity="0.2" stroke="#10B981" strokeWidth="1.3" />
+    <text x="329" y="184" fontSize="11.5" fill="currentColor" textAnchor="middle">＋4</text>
+    {/* 合成 W2 */}
+    <line x1="362" y1="45" x2="404" y2="102" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.1" />
+    <line x1="362" y1="180" x2="404" y2="124" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.1" />
+    <rect x="406" y="96" width="54" height="34" rx="6" fill="#3B82F6" fillOpacity="0.16" stroke="#3B82F6" strokeWidth="1.4" />
+    <text x="433" y="113" fontSize="10.5" fill="currentColor" textAnchor="middle">W₂ で</text>
+    <text x="433" y="125" fontSize="10.5" fill="currentColor" textAnchor="middle">合成</text>
+    <line x1="460" y1="113" x2="478" y2="113" stroke="currentColor" strokeOpacity="0.55" strokeWidth="1.4" markerEnd="url(#ffnSelArrow)" />
+    <rect x="480" y="96" width="36" height="34" rx="6" fill="#10B981" fillOpacity="0.18" stroke="#10B981" strokeWidth="1.3" />
+    <text x="498" y="117" fontSize="10.5" fill="currentColor" textAnchor="middle">出力</text>
+  </svg>
+  <figcaption style={{fontSize: '0.82rem', marginTop: '0.3rem', opacity: 0.85}}>各質問への回答（内積）のうち、負＝「いいえ」を ReLU が遮断。生き残った「はい」だけを合成して新しい表現を作る。数値は次節の手計算と同じ</figcaption>
+</figure>
+
+では、途中の ReLU を抜いたらどうなるでしょう？ 行列積には結合法則があるので、
+
+$$
+x W_1 W_2 = x\,(W_1 W_2) = x W'
+$$
+
+と**先に $W_1 W_2$ を1枚の行列 $W'$ にまとめられてしまい、広げた意味が完全に消えます**。線形変換をいくら重ねても1枚の線形変換と同じ——直線をいくら足しても直線のまま、ということです。ReLU という「選別」が挟まって初めて、この式変形が成り立たなくなり、**入力ごとに違う回路が動く**表現力が生まれます。「広げて → 非線形 → 戻す」の3点セットは、どれか1つ欠けても機能しないのです。
+
+:::note[FFN は「知識の貯蔵庫」]
+
+Attention が「他の単語から情報を**集める**」係だとすると、FFN は「集めた情報を**自分の知識と照らして解釈し直す**」係です。実際、近年の研究では、「東京 → 日本の首都」のような**事実知識の多くが FFN の重み（$W_1$ の質問と $W_2$ の合成ルール）に書き込まれている**ことが示唆されています。パラメータ数でも FFN は Transformer 全体の約3分の2を占める、堂々たる主役級の部品です。
+
+:::
+
 ### 3.3 具体例：手で1ステップ追う
 
 $d_{\text{model}} = 2$、$d_{\text{ff}} = 4$ の小さな例で、1単語ぶんを計算してみます。入力 $x = [1,\ -2]$、
@@ -1039,6 +1131,20 @@ print(transformer(x).shape)                  # torch.Size([1, 3, 4])
 ここで組んだブロックを数十段積み、入口に①②（埋め込み・位置）、出口に「次の単語を予測する層」を付ければ、構造としては GPT 系の言語モデルとほぼ同じです。残るのは「大量のテキストでどう学習するか」だけ——その学習の話は、今後の章で扱います。あなたはもう、Transformer の**部品も組み立て方も**理解できています。
 
 :::
+
+### 6.4 どの数字を「誰が」決めるのか
+
+この章にはたくさんの行列や数値が登場しました。「$W_1$ や $W_2$ の中身は、いったいどこから来るの？」と気になった人のために、登場人物を**決め方**で3種類に整理しておきます。
+
+| 種類 | この2章で登場したもの | 決め方 |
+| --- | --- | --- |
+| **学習で決まるパラメータ** | 埋め込み行列 $E$、FFN の $W_1, W_2, b_1, b_2$、Attention の $W_Q, W_K, W_V, W_O$、LayerNorm の $\gamma, \beta$ | 最初は**ランダムな値**。学習中に予測の誤差を減らす方向へ、少しずつ調整され続ける |
+| **人間が決めるハイパーパラメータ** | $d_{\text{model}}$、$d_{\text{ff}}$（$4\times$ など）、ヘッド数 $h$、ブロック数 $N$、位置エンコーディングの $10000$ | 設計者が**手で選ぶ**。モデルの「箱の大きさ・形」を決める |
+| **固定の計算（学習しない）** | ReLU、softmax、sin・cos の位置エンコーディング、スキップ接続の足し算 | ただの**決まった関数**。中に調整される数値を持たない |
+
+ポイントは、**人間が決めるのは「箱の大きさ」まで**だということです。たとえば FFN の $W_1$ を「$512 \times 2048$ の行列にする」と決めるのは人間ですが、その約100万個の数字に**何が入るかは100%学習まかせ**です。学習は「次の単語を予測 → 外れたら、誤差を逆向きにたどって（4節で登場した勾配です）全パラメータを誤差が減る方向に微調整」という単純なループを、膨大なテキストに対してひたすらくり返すだけ。その積み重ねの副産物として、$W_1$ の列は「役に立つ質問」（3.2 節）に、埋め込み $E$ の行は「意味を映すベクトル」（1.2 節）に、**勝手に育っていきます**。役に立つ重みを持つほど予測ミスが減るので、自然とそうなるのです。
+
+この「学習のループを実際にどう回すのか」が、まさに今後の章で扱うテーマです。
 
 ---
 
